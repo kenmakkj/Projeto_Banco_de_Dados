@@ -1,0 +1,163 @@
+Table tb_funcionarios {
+  pk_id_funcionario int [pk, increment] 
+  nome_funcionario varchar(120) [not null]
+  cpf_funcionario varchar(11) [unique, not null]
+  cargo_funcionario varchar(50) [not null]
+  data_admissao date [not null]
+  salario_funcionario decimal(10,2) [not null] 
+  data_criacao date [default: `now()`]
+}
+
+Table tb_professores {
+  pk_id_professor int [pk, ref: > tb_funcionarios.pk_id_funcionario]
+  especializacao varchar(100)
+}
+
+Table tb_status_aluno {
+  pk_id_status int [pk, increment]
+  descricao varchar(20) [not null]
+}
+
+Table tb_alunos {
+  pk_id_aluno int [pk, increment]
+  nome_aluno varchar(120) [not null]
+  cpf_aluno varchar(11) [unique, not null]
+  data_nascimento date [not null]
+  fk_id_status int [ref: > tb_status_aluno.pk_id_status]
+}
+
+Table tb_tipo_curso {
+  pk_id_tipo_curso int [pk, increment]
+  descricao varchar(50) [not null]
+}
+
+Table tb_cursos {
+  pk_id_curso int [pk, increment]
+  nome_curso varchar(100) [not null]
+  fk_id_tipo_curso int [ref: > tb_tipo_curso.pk_id_tipo_curso]
+  data_criacao date [default: `now()`]
+}
+
+Table tb_disciplinas {
+  pk_id_disciplina int [pk, increment]
+  nome_disciplina varchar(100) [not null]
+  carga_horaria int [not null]
+}
+
+Table tb_curso_disciplinas {
+  fk_id_curso int [ref: > tb_cursos.pk_id_curso]
+  fk_id_disciplina int [ref: > tb_disciplinas.pk_id_disciplina]
+  periodo_sugerido int
+  
+  indexes {
+    (fk_id_curso, fk_id_disciplina) [pk]
+  }
+}
+
+Table tb_vinculos_professor_disciplina {
+  fk_id_professor int [ref: > tb_professores.pk_id_professor]
+  fk_id_disciplina int [ref: > tb_disciplinas.pk_id_disciplina]
+  ano_letivo int
+  
+  indexes {
+    (fk_id_professor, fk_id_disciplina, ano_letivo) [pk]
+  }
+}
+
+Table tb_turmas {
+  pk_id_turma int [pk, increment]
+  fk_id_disciplina int [ref: > tb_disciplinas.pk_id_disciplina]
+  fk_id_professor int [ref: > tb_professores.pk_id_professor]
+  ano_letivo int [not null]
+  semestre int [not null]
+}
+
+Table tb_matriculas {
+  fk_id_aluno int [ref: > tb_alunos.pk_id_aluno]
+  fk_id_turma int [ref: > tb_turmas.pk_id_turma]
+  data_matricula date [default: `now()`]
+
+  indexes {
+    (fk_id_aluno, fk_id_turma) [pk]
+  }
+}
+
+Table tb_notas {
+  pk_id_nota int [pk, increment]
+  fk_id_aluno int [not null]
+  fk_id_turma int [not null]
+  valor_nota decimal(4,2)
+  data_lancamento date
+}
+
+Ref: tb_notas.(fk_id_aluno, fk_id_turma) > tb_matriculas.(fk_id_aluno, fk_id_turma)
+
+Table tb_faltas {
+  pk_id_falta int [pk, increment]
+  fk_id_aluno int [not null]
+  fk_id_turma int [not null]
+  data_falta date [not null]
+}
+
+Ref: tb_faltas.(fk_id_aluno, fk_id_turma) > tb_matriculas.(fk_id_aluno, fk_id_turma)
+
+Table tb_grade_horaria {
+  pk_id_grade int [pk, increment]
+  fk_id_turma int [ref: > tb_turmas.pk_id_turma]
+  dia_semana int
+  horario_inicio time [not null]
+  horario_fim time [not null]
+  sala_aula varchar(20)
+}
+
+Table tb_status_contrato {
+  pk_id_status int [pk, increment]
+  descricao varchar(20) [not null]
+}
+
+Table tb_contratos_educacionais {
+  pk_id_contrato int [pk, increment]
+  fk_id_aluno int [ref: > tb_alunos.pk_id_aluno]
+  data_contrato date [not null]
+  valor_total decimal(10,2) [not null]
+  fk_id_status int [ref: > tb_status_contrato.pk_id_status]
+}
+
+Table tb_status_pagamento {
+  pk_id_status int [pk, increment]
+  descricao varchar(20) [not null]
+}
+
+Table tb_mensalidades {
+  pk_id_mensalidade int [pk, increment]
+  fk_id_contrato int [ref: > tb_contratos_educacionais.pk_id_contrato]
+  valor_parcela decimal(10,2) [not null]
+  data_vencimento date [not null]
+  data_pagamento date 
+  fk_id_status int [ref: > tb_status_pagamento.pk_id_status]
+  ultima_atualizacao date
+}
+
+Table tb_contas_receber {
+  pk_id_conta_receber int [pk, increment]
+  fk_id_mensalidade int [ref: > tb_mensalidades.pk_id_mensalidade]
+  valor_previsto decimal(10,2) [not null]
+  data_expectativa date
+}
+
+Table tb_contas_pagar {
+  pk_id_conta_pagar int [pk, increment]
+  descricao_despesa varchar(150) [not null]
+  valor_despesa decimal(10,2) [not null]
+  data_vencimento date [not null]
+  fk_id_funcionario_autorizador int [ref: > tb_funcionarios.pk_id_funcionario]
+  fk_id_status int [ref: > tb_status_pagamento.pk_id_status]
+}
+
+Table tb_carga_horaria_docente {
+  pk_id_carga int [pk, increment]
+  fk_id_professor int [ref: > tb_professores.pk_id_professor]
+  total_horas_semanais int [not null]
+  mes_referencia int
+  ano_referencia int
+}
