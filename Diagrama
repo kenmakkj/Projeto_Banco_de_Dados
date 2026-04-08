@@ -1,163 +1,252 @@
-Table tb_funcionarios {
-  pk_id_funcionario int [pk, increment] 
-  nome_funcionario varchar(120) [not null]
-  cpf_funcionario varchar(11) [unique, not null]
-  cargo_funcionario varchar(50) [not null]
-  data_admissao date [not null]
-  salario_funcionario decimal(10,2) [not null] 
-  data_criacao date [default: `now()`]
+
+//modulo academico da Universidade
+
+table tb_alunos {
+ pk_aluno int [pk, increment] 
+ nome_aluno varchar(60) [not null] 
+ cpf_aluno varchar(11) [unique, not null]
+ data_nascimento date [not null]
+ fk_status int [ref: > tb_status_aluno.pk_status] //referencia a tabela status e puxa a pk_status como fk
+ ultima_atualizacao date [not null, default: `now()`] //para o sistema identificar qualquer mudança e atualiza-las
+
+} 
+
+
+table tb_status_aluno { //criado para poder identificar se o aluno está ativo ou trancado
+ pk_status int [pk, increment]
+ situacao_aluno varchar(60) [not null]
 }
+
+table tb_cursos {
+ pk_cursos int [pk, increment]
+ nome_curso varchar(50) [not null]
+ fk_tipo_curso int [ref: > tb_tipo_curso.pk_tipo_curso] //referencia a tabela tipo_cursos e a puxa com fk, evitando redundancia
+ data_criacao date [default: `now()`] //pra identificar quando o curso foi criado
+ ultima_atualizacao date [not null, default: `now()`] // para o sistema identificar qualquer mudança e atualiza-las
+}  
+
+table tb_tipo_curso { //Tabela criada para evitar redundancias na procuras de cursos
+ pk_tipo_curso int [pk, increment]
+ nome_tipo_curso varchar(50) [not null]
+}
+
+
+table tb_disciplina {
+ pk_disciplina int [pk, increment]
+ nome_disciplina varchar(100) [not null]  
+ carga_horaria int [not null]  
+ fk_cursos int [not null, ref: > tb_cursos.pk_cursos]  //referencia a tabela tipo_cursos e a puxa com fk, evitando redundancia
+ data_criacao date [not null, default: `now()`] //para identificar quando a disciplina for adicionada em um novo semestre
+ ultima_atualizacao date [not null, default: `now()`]// para o sistema identificar qualquer mudança e atualizar na mesma hora
+} 
+
+
+table tb_matriculas {
+ pk_matriculas int [pk, increment]
+ fk_aluno int [not null, ref: > tb_alunos.pk_aluno] // FK para o Aluno, e utlizzando a entidade associativa
+ fk_disciplina int [not null, ref: > tb_disciplina.pk_disciplina] // FK para a Disciplina
+ data_matricula date [not null, default: `now()`] // Data em que foi realizada
+ status_matricula varchar(20) [not null] 
+ data_criacao date [not null, default: `now()`]
+ ultima_atualizacao date [not null, default: `now()`]
+}
+
+
+table tb_turmas {
+ pk_turmas int [pk, increment]
+ fk_disciplina int [not null, ref: > tb_disciplina.pk_disciplina] 
+ fk_professor int [not null, ref: > tb_professores.pk_professor] 
+ semestre varchar(10) [not null] 
+ data_criacao date [not null, default: `now()`]
+ ultima_atualizacao date [not null, default: `now()`]
+}
+
+
+table tb_notas {
+ pk_notas int [pk, increment]
+ fk_matriculas int [not null, ref: > tb_matriculas.pk_matriculas] 
+ nota_final decimal(4,2) [not null] //é usado para garantir a precisão exata de valores numéricos, 4 sendo o total de digitos, e o 2 dizendo quantos numeros irão após a virgula Ex:10,00
+ data_criacao date [not null, default: `now()`]
+ ultima_atualizacao date [not null, default: `now()`] 
+}
+
+
+table tb_faltas {
+ pk_faltas int [pk, increment]
+ fk_matriculas int [not null, ref: > tb_matriculas.pk_matriculas] // Ligação com o aluno e a disciplina
+ quantidade_faltas int [not null]
+ data_falta date [not null] 
+ data_criacao date [not null, default: `now()`]
+ ultima_atualizacao date [not null, default: `now()`]
+}
+
+
+table tb_grade_horaria {
+ pk_grade int [pk, increment]
+ fk_turma int [not null, ref: > tb_turmas.pk_turmas] // Liga o horário a uma turma específica
+ dia_semana varchar(20) [not null] 
+ hora_inicio time [not null] 
+ hora_fim time [not null] 
+ sala_aula varchar(50) 
+ data_criacao date [not null, default: `now()`]
+ ultima_atualizacao date [not null, default: `now()`] 
+}
+
+// Modulo financeiro
+
+table tb_contratos_educacionais {
+ pk_contratos int [pk, increment] 
+ fk_aluno int [not null, ref: > tb_alunos.pk_aluno] 
+ fk_status_contrato int [not null, ref: > tb_status_contrato.pk_status_contrato] // Suporte para evitar redundância
+ valor_total_contrato decimal(10,2) [not null] // usado o decimal 10,2 como o professor sugeriu porque se trata de valores maiores, portanto 4 digitos não seriam suficiente
+ data_assinatura date [not null]
+ data_criacao date [not null, default: `now()`]
+ ultima_atualizacao date [not null, default: `now()`]
+}
+
+table tb_status_contrato { //tabela suporte
+ pk_status_contrato int [pk, increment]
+ nome_status varchar(50) [not null] //Ativo, Encerrado ou Suspenso
+}
+
+
+table tb_mensalidades {
+ pk_mensalidade int [pk, increment]
+ fk_contrato int [not null, ref: > tb_contratos_educacionais.pk_contratos] // ligaçao com a tabela contratos_educacionais
+ fk_status_pagamento int [not null, ref: > tb_status_pagamento.pk_status_pagamento] //referencia a tabela suporte para evitar redundancias
+ valor_mensalidade decimal(10,2) [not null] // usado o decimal 10,2 como o professor sugeriu porque se trata de valores maiores, portanto 4 digitos não seriam suficiente
+ data_vencimento date [not null]  
+ data_criacao date [not null, default: `now()`]
+ ultima_atualizacao date [not null, default: `now()`]
+}
+
+table tb_status_pagamento { //tabela suporte
+ pk_status_pagamento int [pk, increment]
+ nome_status varchar(30) [not null] // se está: Pendente, Pago, Atrasado, Renegociado
+}
+
+
+table tb_pagamentos {
+ pk_pagamentos int [pk, increment]
+ fk_mensalidade int [not null, ref: > tb_mensalidades.pk_mensalidade] 
+ fk_tipo_pagamento int [not null, ref: > tb_tipo_pagamento.pk_tipo_pagamento] // ligação com tabela suporte
+ valor_pago decimal(10,2) [not null]
+ data_pagamento date [not null] 
+ data_criacao date [not null, default: `now()`]
+ ultima_atualizacao date [not null, default: `now()`]
+}
+
+
+table tb_contas_pagar {
+ pk_conta_pagar int [pk, increment]
+ descricao_conta varchar(100) [not null] 
+ valor_previsto decimal(10,2) [not null] 
+ data_vencimento date [not null]
+ fk_centro_custo int [not null, ref: > tb_centro_custo.pk_centro_custo] // liga com a tabela suporte
+ data_criacao date [not null, default: `now()`]
+ ultima_atualizacao date [not null, default: `now()`]
+}
+
+table tb_contas_receber {
+ pk_conta_receber int [pk, increment]
+ fk_aluno int [not null, ref: > tb_alunos.pk_aluno]
+ origem_receita varchar(50) [not null] //se o dinheiro que foi recebido veio de: mensalidade, multa etc
+ valor_esperado decimal(10,2) [not null]
+ data_expectativa date [not null]
+ fk_status_recebimento int [not null, ref: > tb_status_recebimento.pk_status_recebimento]
+ data_criacao date [not null, default: `now()`]
+ ultima_atualizacao date [not null, default: `now()`]
+}
+
+
+Table tb_status_recebimento { //tabela suporte, Esta tabela serve para padronizar as situações financeiras, evitando que o usuario digite "recebido" em 1,000 contas diferentes
+  pk_status_recebimento int [pk, increment]
+  nome_status varchar(50) [not null] //se está pago ou não
+}
+
+
+Table tb_centro_custo { //tabela suporte, com ela fica mais claros onde e quanto são gastos em cada lugar, evitando redundancias e deixando mais rapido pra localizar
+  pk_centro_custo int [pk, increment]
+  nome_centro_custo varchar(50) [not null] 
+}
+
+
+table tb_inadimplencia {
+ pk_inadimplencia int [pk, increment]
+ fk_aluno int [not null, ref: > tb_alunos.pk_aluno] 
+ fk_mensalidade int [not null, ref: > tb_mensalidades.pk_mensalidade] // mostra qual mensalidade está atrasada
+ fk_grau_risco int [not null, ref: > tb_grau_risco.pk_grau_risco] // Suporte para análise de risco:Baixo, média e critico
+ valor_atualizado decimal(10,2) [not null] // Valor com multas/juros
+ dias_atraso int [not null]
+ data_criacao date [not null, default: `now()`]
+ ultima_atualizacao date [not null, default: `now()`]
+}
+
+Table tb_grau_risco { //tabela suporte
+  pk_grau_risco int [pk, increment]
+  descricao_risco varchar(50) [not null] //identifica quais cobranças deveram ser feitas primeiro, identificadas como baixa, media e critica
+}
+
+
+table tb_tipo_pagamento { //tabela suporte
+ pk_tipo_pagamento int [pk, increment]
+ nome_tipo varchar(50) [not null] //pix, boleto, crédito, etc
+}
+
+
+// Modulo RH
 
 Table tb_professores {
-  pk_id_professor int [pk, ref: > tb_funcionarios.pk_id_funcionario]
-  especializacao varchar(100)
+ pk_professor int [pk, increment]
+ fk_cargo int [not null, ref: > tb_cargos.pk_cargo] //
+ fk_centro_custo int [not null, ref: > tb_centro_custo.pk_centro_custo] // para localizar o salario base do professor e já "risca-lo" da lista de pagamento, deixando assim o sistema mais rapido
+ nome_professor varchar(120) [not null]
+ cpf_professor varchar(11) [unique, not null]
+ titulacao_maxima varchar(50) // Ex: Doutorado, Mestrado
+ data_criacao date [not null, default: `now()`]
+ ultima_atualizacao date [not null, default: `now()`]
 }
 
-Table tb_status_aluno {
-  pk_id_status int [pk, increment]
-  descricao varchar(20) [not null]
+Table tb_cargos { // tabela suporte, identificar quem é o que e quanto ganham, as tabelas funcionarios e professores apenas vestem o que essa tabela faz
+ pk_cargo int [pk, increment]
+ nome_cargo varchar(60) [not null] // Ex: Professor Titular, Coordenador, Diretor
+ salario_base decimal(10,2) [not null] // Padronização financeira
 }
 
-Table tb_alunos {
-  pk_id_aluno int [pk, increment]
-  nome_aluno varchar(120) [not null]
-  cpf_aluno varchar(11) [unique, not null]
-  data_nascimento date [not null]
-  fk_id_status int [ref: > tb_status_aluno.pk_id_status]
+table tb_funcionarios {
+ pk_funcionarios int [pk, increment]
+ nome_funcionario varchar(120) [not null]
+ cpf_funcionario varchar(11) [unique, not null]
+ data_nascimento date [not null]
+ fk_cargo int [not null, ref: > tb_cargos.pk_cargo] // Define salário e função
+ fk_centro_custo int [not null, ref: > tb_centro_custo.pk_centro_custo] // Integração com Financeiro
+ data_criacao date [not null, default: `now()`] // Data de admissão
+ ultima_atualizacao date [not null, default: `now()`] //caso o funcionario seja desligada, esse campo serve para atualizar
 }
 
-Table tb_tipo_curso {
-  pk_id_tipo_curso int [pk, increment]
-  descricao varchar(50) [not null]
+
+table tb_professor_disciplina {
+ pk_vinculo int [pk, increment]
+ fk_professor int [not null, ref: > tb_professores.pk_professor]
+ fk_disciplina int [not null, ref: > tb_disciplina.pk_disciplina] // Qual matéria ele leciona
+ semestre_ano varchar(6) [not null] //identifica o semestre que está
+ carga_horaria_alocada int [not null] // Quantas horas dessa disciplina ficam com ele
+ data_criacao date [not null, default: `now()`]
+ ultima_atualizacao date [not null, default: `now()`]
 }
 
-Table tb_cursos {
-  pk_id_curso int [pk, increment]
-  nome_curso varchar(100) [not null]
-  fk_id_tipo_curso int [ref: > tb_tipo_curso.pk_id_tipo_curso]
-  data_criacao date [default: `now()`]
+
+table tb_carga_horaria_docente {
+ pk_carga_horaria int [pk, increment]
+ fk_professor int [not null, ref: - tb_professores.pk_professor] // Relação 1:1 ou 1:N com o docente
+ horas_semanais_contratadas int [not null]
+ tipo_regime varchar(50) [not null]
+ data_inicio_vigencia date [not null] //diz ao sistema quando aquela regra era va´lida, permite que o sistem "volte no tempo" para conseguir informação, exemplo, caso algum funcionario mude de cargp, ficará salvo os dois na vigencia
+ data_fim_vigencia date // Nulo se o contrato estiver ativo
+ ultima_atualizacao date [not null, default: `now()`]
 }
 
-Table tb_disciplinas {
-  pk_id_disciplina int [pk, increment]
-  nome_disciplina varchar(100) [not null]
-  carga_horaria int [not null]
-}
 
-Table tb_curso_disciplinas {
-  fk_id_curso int [ref: > tb_cursos.pk_id_curso]
-  fk_id_disciplina int [ref: > tb_disciplinas.pk_id_disciplina]
-  periodo_sugerido int
-  
-  indexes {
-    (fk_id_curso, fk_id_disciplina) [pk]
-  }
-}
 
-Table tb_vinculos_professor_disciplina {
-  fk_id_professor int [ref: > tb_professores.pk_id_professor]
-  fk_id_disciplina int [ref: > tb_disciplinas.pk_id_disciplina]
-  ano_letivo int
-  
-  indexes {
-    (fk_id_professor, fk_id_disciplina, ano_letivo) [pk]
-  }
-}
 
-Table tb_turmas {
-  pk_id_turma int [pk, increment]
-  fk_id_disciplina int [ref: > tb_disciplinas.pk_id_disciplina]
-  fk_id_professor int [ref: > tb_professores.pk_id_professor]
-  ano_letivo int [not null]
-  semestre int [not null]
-}
-
-Table tb_matriculas {
-  fk_id_aluno int [ref: > tb_alunos.pk_id_aluno]
-  fk_id_turma int [ref: > tb_turmas.pk_id_turma]
-  data_matricula date [default: `now()`]
-
-  indexes {
-    (fk_id_aluno, fk_id_turma) [pk]
-  }
-}
-
-Table tb_notas {
-  pk_id_nota int [pk, increment]
-  fk_id_aluno int [not null]
-  fk_id_turma int [not null]
-  valor_nota decimal(4,2)
-  data_lancamento date
-}
-
-Ref: tb_notas.(fk_id_aluno, fk_id_turma) > tb_matriculas.(fk_id_aluno, fk_id_turma)
-
-Table tb_faltas {
-  pk_id_falta int [pk, increment]
-  fk_id_aluno int [not null]
-  fk_id_turma int [not null]
-  data_falta date [not null]
-}
-
-Ref: tb_faltas.(fk_id_aluno, fk_id_turma) > tb_matriculas.(fk_id_aluno, fk_id_turma)
-
-Table tb_grade_horaria {
-  pk_id_grade int [pk, increment]
-  fk_id_turma int [ref: > tb_turmas.pk_id_turma]
-  dia_semana int
-  horario_inicio time [not null]
-  horario_fim time [not null]
-  sala_aula varchar(20)
-}
-
-Table tb_status_contrato {
-  pk_id_status int [pk, increment]
-  descricao varchar(20) [not null]
-}
-
-Table tb_contratos_educacionais {
-  pk_id_contrato int [pk, increment]
-  fk_id_aluno int [ref: > tb_alunos.pk_id_aluno]
-  data_contrato date [not null]
-  valor_total decimal(10,2) [not null]
-  fk_id_status int [ref: > tb_status_contrato.pk_id_status]
-}
-
-Table tb_status_pagamento {
-  pk_id_status int [pk, increment]
-  descricao varchar(20) [not null]
-}
-
-Table tb_mensalidades {
-  pk_id_mensalidade int [pk, increment]
-  fk_id_contrato int [ref: > tb_contratos_educacionais.pk_id_contrato]
-  valor_parcela decimal(10,2) [not null]
-  data_vencimento date [not null]
-  data_pagamento date 
-  fk_id_status int [ref: > tb_status_pagamento.pk_id_status]
-  ultima_atualizacao date
-}
-
-Table tb_contas_receber {
-  pk_id_conta_receber int [pk, increment]
-  fk_id_mensalidade int [ref: > tb_mensalidades.pk_id_mensalidade]
-  valor_previsto decimal(10,2) [not null]
-  data_expectativa date
-}
-
-Table tb_contas_pagar {
-  pk_id_conta_pagar int [pk, increment]
-  descricao_despesa varchar(150) [not null]
-  valor_despesa decimal(10,2) [not null]
-  data_vencimento date [not null]
-  fk_id_funcionario_autorizador int [ref: > tb_funcionarios.pk_id_funcionario]
-  fk_id_status int [ref: > tb_status_pagamento.pk_id_status]
-}
-
-Table tb_carga_horaria_docente {
-  pk_id_carga int [pk, increment]
-  fk_id_professor int [ref: > tb_professores.pk_id_professor]
-  total_horas_semanais int [not null]
-  mes_referencia int
-  ano_referencia int
-}
+Ref: "tb_turmas"."pk_turmas" < "tb_turmas"."semestre"
