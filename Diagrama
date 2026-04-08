@@ -4,7 +4,7 @@
 table tb_alunos {
  pk_aluno int [pk, increment] 
  nome_aluno varchar(60) [not null] 
- cpf_aluno varchar(11) [unique, not null]
+ cpf_aluno char(11) [unique, not null]
  data_nascimento date [not null]
  fk_status int [ref: > tb_status_aluno.pk_status] //referencia a tabela status e puxa a pk_status como fk
  ultima_atualizacao date [not null, default: `now()`] //para o sistema identificar qualquer mudança e atualiza-las
@@ -201,7 +201,7 @@ Table tb_professores {
  fk_cargo int [not null, ref: > tb_cargos.pk_cargo] //
  fk_centro_custo int [not null, ref: > tb_centro_custo.pk_centro_custo] // para localizar o salario base do professor e já "risca-lo" da lista de pagamento, deixando assim o sistema mais rapido
  nome_professor varchar(120) [not null]
- cpf_professor varchar(11) [unique, not null]
+ cpf_professor char(11) [unique, not null]
  titulacao_maxima varchar(50) // Ex: Doutorado, Mestrado
  data_criacao date [not null, default: `now()`]
  ultima_atualizacao date [not null, default: `now()`]
@@ -216,7 +216,7 @@ Table tb_cargos { // tabela suporte, identificar quem é o que e quanto ganham, 
 table tb_funcionarios {
  pk_funcionarios int [pk, increment]
  nome_funcionario varchar(120) [not null]
- cpf_funcionario varchar(11) [unique, not null]
+ cpf_funcionario char(11) [unique, not null]
  data_nascimento date [not null]
  fk_cargo int [not null, ref: > tb_cargos.pk_cargo] // Define salário e função
  fk_centro_custo int [not null, ref: > tb_centro_custo.pk_centro_custo] // Integração com Financeiro
