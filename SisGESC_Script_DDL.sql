@@ -212,6 +212,7 @@ CREATE TABLE tb_avaliacoes (
   fk_disciplina INT          NOT NULL,
   descricao     VARCHAR(50)  NOT NULL COMMENT 'P1, P2, Trabalho',
   peso          DECIMAL(3,2) NOT NULL,
+  data_limite_alteracao DATE         NULL,
   CONSTRAINT pk_avaliacoes       PRIMARY KEY (pk_avaliacao),
   CONSTRAINT fk_aval_disciplina  FOREIGN KEY (fk_disciplina) REFERENCES tb_disciplinas(pk_disciplina)
 );
