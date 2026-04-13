@@ -1,11 +1,27 @@
 
+-- =============================================================================
 -- SisGESC — Script DDL (MySQL)
+-- Sistema de Gestão Escolar — Universidade Privada
+-- Modelagem relacional em 3FN (Terceira Forma Normal)
+--
+-- Módulos:
+--   1. Base / Pessoas       — identidade, endereços, contatos
+--   2. Módulo Acadêmico     — cursos, alunos, matrículas, notas, faltas
+--   3. Módulo RH            — funcionários, folha, férias, afastamentos
+--   4. Módulo Financeiro    — contratos, mensalidades, pagamentos, bolsas
+-- =============================================================================
 
 CREATE DATABASE IF NOT EXISTS sisgesc
   CHARACTER SET utf8mb4
   COLLATE utf8mb4_unicode_ci;
 
 USE sisgesc;
+
+-- =============================================================================
+-- BASE / PESSOAS
+-- Centraliza a identidade de alunos, professores e funcionários via CPF.
+-- Resolve endereços em 3FN separando CEP em tabela própria.
+-- =============================================================================
 
 CREATE TABLE tb_pessoas (
   pk_cpf             CHAR(11)     NOT NULL,
@@ -61,6 +77,12 @@ CREATE TABLE tb_emails (
   CONSTRAINT fk_email_cpf     FOREIGN KEY (fk_cpf) REFERENCES tb_pessoas(pk_cpf)
 );
 
+-- =============================================================================
+-- MÓDULO ACADÊMICO
+-- Gerencia cursos, alunos, matrículas, avaliações, notas, faltas e aulas.
+-- Aplica regras de negócio RN01–RN10 via constraints e lógica de aplicação.
+-- =============================================================================
+
 CREATE TABLE tb_tipo_curso (
   pk_tipo_curso INT         NOT NULL AUTO_INCREMENT,
   descricao     VARCHAR(30) NOT NULL COMMENT 'Graduação, Pós, Extensão',
@@ -82,7 +104,8 @@ CREATE TABLE tb_cursos (
 CREATE TABLE tb_status_aluno (
   pk_status_aluno INT         NOT NULL,
   descricao       VARCHAR(20) NOT NULL COMMENT 'ativo, trancado, desistente, formado',
-  CONSTRAINT pk_status_aluno PRIMARY KEY (pk_status_aluno)
+  CONSTRAINT pk_status_aluno    PRIMARY KEY (pk_status_aluno),
+  CONSTRAINT uq_status_aluno    UNIQUE      (descricao)
 );
 
 CREATE TABLE tb_alunos (
@@ -205,6 +228,7 @@ CREATE TABLE tb_avaliacoes (
   peso          DECIMAL(3,2) NOT NULL,
   data_limite_alteracao DATE         NULL,
   CONSTRAINT pk_avaliacoes       PRIMARY KEY (pk_avaliacao),
+  CONSTRAINT ck_peso_avaliacao   CHECK       (peso BETWEEN 0 AND 1),
   CONSTRAINT fk_aval_disciplina  FOREIGN KEY (fk_disciplina) REFERENCES tb_disciplinas(pk_disciplina)
 );
 
@@ -277,6 +301,13 @@ CREATE TABLE tb_aulas (
   CONSTRAINT fk_aula_sala        FOREIGN KEY (fk_sala)          REFERENCES tb_salas(pk_sala),
   CONSTRAINT fk_aula_periodo     FOREIGN KEY (fk_periodo)       REFERENCES tb_periodos(pk_periodo)
 );
+
+-- =============================================================================
+-- MÓDULO RH
+-- Gerencia funcionários, professores, cargos, folha de pagamento,
+-- verbas, benefícios, férias e afastamentos.
+-- Regras de negócio: RN12 e RN13 (integridade da folha).
+-- =============================================================================
 
 CREATE TABLE tb_departamentos (
   pk_departamento    INT         NOT NULL AUTO_INCREMENT,
@@ -421,6 +452,13 @@ CREATE TABLE tb_afastamentos (
   CONSTRAINT fk_afas_func     FOREIGN KEY (fk_cpf_funcionario) REFERENCES tb_funcionarios(pk_fk_cpf),
   CONSTRAINT fk_afas_tipo     FOREIGN KEY (fk_tipo)            REFERENCES tb_tipo_afastamento(pk_tipo)
 );
+
+-- =============================================================================
+-- MÓDULO FINANCEIRO
+-- Gerencia contratos educacionais, descontos/bolsas, mensalidades e
+-- pagamentos. Integra com o Módulo Acadêmico via RN02, RN04 e RN11.
+-- Regras de negócio: RN14 e RN15 (bolsas e inadimplência).
+-- =============================================================================
 
 CREATE TABLE tb_status_pagamento (
   pk_status_pagamento INT         NOT NULL,
