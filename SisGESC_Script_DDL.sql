@@ -19,8 +19,6 @@ CREATE TABLE tb_pessoas (
   CONSTRAINT pk_pessoas PRIMARY KEY (pk_cpf)
 );
 
--- Resolve dependência transitiva de tb_enderecos (3FN).
--- CEP determina logradouro, bairro, cidade e estado.
 CREATE TABLE tb_cep (
   pk_cep     CHAR(8)      NOT NULL,
   logradouro VARCHAR(100) NOT NULL,
@@ -100,8 +98,6 @@ CREATE TABLE tb_alunos (
   CONSTRAINT fk_aluno_status  FOREIGN KEY (fk_status) REFERENCES tb_status_aluno(pk_status_aluno)
 );
 
--- N:N entre Aluno e Curso
--- Um aluno pode cursar duas graduações simultaneamente
 CREATE TABLE tb_aluno_curso (
   pk_aluno_curso INT      NOT NULL AUTO_INCREMENT,
   fk_cpf_aluno   CHAR(11) NOT NULL,
@@ -130,13 +126,12 @@ CREATE TABLE tb_disciplinas (
   pk_disciplina INT         NOT NULL AUTO_INCREMENT,
   nome          VARCHAR(60) NOT NULL,
   carga_horaria INT         NOT NULL,
-  -- RN03: carga horária mínima de 40 horas
+
   CONSTRAINT pk_disciplinas      PRIMARY KEY (pk_disciplina),
   CONSTRAINT uq_disciplinas_nome UNIQUE      (nome),
   CONSTRAINT ck_carga_horaria    CHECK       (carga_horaria >= 40)
 );
 
--- N:N entre Curso e Disciplina
 CREATE TABLE tb_grade_curricular (
   fk_curso          INT NOT NULL,
   fk_disciplina     INT NOT NULL,
@@ -146,8 +141,7 @@ CREATE TABLE tb_grade_curricular (
   CONSTRAINT fk_gc_disciplina    FOREIGN KEY (fk_disciplina) REFERENCES tb_disciplinas(pk_disciplina)
 );
 
--- N:N de uma disciplina com ela mesma (pré-requisitos)
--- Ex: Cálculo II (fk_disciplina) requer Cálculo I (fk_requisito)
+
 CREATE TABLE tb_pre_requisitos (
   fk_disciplina INT NOT NULL,
   fk_requisito  INT NOT NULL,
@@ -156,7 +150,7 @@ CREATE TABLE tb_pre_requisitos (
   CONSTRAINT fk_pr_requisito   FOREIGN KEY (fk_requisito)  REFERENCES tb_disciplinas(pk_disciplina)
 );
 
--- Centraliza Ano e Semestre, eliminando dependência transitiva
+
 CREATE TABLE tb_periodos (
   pk_periodo INT NOT NULL AUTO_INCREMENT,
   ano        INT NOT NULL,
@@ -178,7 +172,6 @@ CREATE TABLE tb_turmas (
   CONSTRAINT fk_turma_curso  FOREIGN KEY (fk_curso) REFERENCES tb_cursos(pk_curso)
 );
 
--- Resolve N:N entre Aluno e Disciplina por período
 CREATE TABLE tb_matriculas (
   pk_matricula  INT      NOT NULL AUTO_INCREMENT,
   fk_cpf_aluno  CHAR(11) NOT NULL,
@@ -193,8 +186,6 @@ CREATE TABLE tb_matriculas (
   CONSTRAINT fk_mat_turma       FOREIGN KEY (fk_turma)      REFERENCES tb_turmas(pk_turma)
 );
 
--- Fecha o ciclo de cada matrícula com o resultado final.
--- Evita recalcular aprovação/reprovação toda vez na aplicação.
 CREATE TABLE tb_resultado_matricula (
   pk_resultado    INT          NOT NULL AUTO_INCREMENT,
   fk_matricula    INT          NOT NULL,
@@ -232,7 +223,7 @@ CREATE TABLE tb_notas (
   CONSTRAINT fk_nota_professor FOREIGN KEY (fk_cpf_professor) REFERENCES tb_professores(pk_fk_cpf)
 );
 
--- Permite alterar nota após lançamento com rastreabilidade
+
 CREATE TABLE tb_log_notas (
   pk_log           INT          NOT NULL AUTO_INCREMENT,
   fk_nota          INT          NOT NULL,
@@ -276,9 +267,9 @@ CREATE TABLE tb_aulas (
   horario_inicio   TIME     NOT NULL,
   horario_fim      TIME     NOT NULL,
   CONSTRAINT pk_aulas            PRIMARY KEY (pk_aula),
-  -- RN09: impede conflito de sala no mesmo horário e período
+ 
   CONSTRAINT uq_aulas_sala       UNIQUE      (fk_sala, dia_semana, horario_inicio, fk_periodo),
-  -- RN09: impede conflito de professor no mesmo horário e período
+
   CONSTRAINT uq_aulas_professor  UNIQUE      (fk_cpf_professor, dia_semana, horario_inicio, fk_periodo),
   CONSTRAINT fk_aula_turma       FOREIGN KEY (fk_turma)         REFERENCES tb_turmas(pk_turma),
   CONSTRAINT fk_aula_disciplina  FOREIGN KEY (fk_disciplina)    REFERENCES tb_disciplinas(pk_disciplina),
@@ -337,7 +328,7 @@ CREATE TABLE tb_titulacoes (
   CONSTRAINT uq_titulacoes UNIQUE      (nome)
 );
 
--- Professor é uma especialização de Funcionário (herança 1:1)
+
 CREATE TABLE tb_professores (
   pk_fk_cpf    CHAR(11)    NOT NULL,
   area_atuacao VARCHAR(50) NOT NULL,
@@ -354,7 +345,7 @@ CREATE TABLE tb_beneficios (
   CONSTRAINT pk_beneficios PRIMARY KEY (pk_beneficio)
 );
 
--- Entidade associativa N:N entre Funcionário e Benefício
+
 CREATE TABLE tb_funcionario_beneficio (
   fk_cpf_funcionario CHAR(11) NOT NULL,
   fk_beneficio       INT      NOT NULL,
@@ -365,7 +356,7 @@ CREATE TABLE tb_funcionario_beneficio (
   CONSTRAINT fk_fb_beneficio    FOREIGN KEY (fk_beneficio)       REFERENCES tb_beneficios(pk_beneficio)
 );
 
--- Folha mensal por funcionário — snapshot imutável do fechamento
+
 CREATE TABLE tb_folha_pagamento (
   pk_folha           INT           NOT NULL AUTO_INCREMENT,
   fk_cpf_funcionario CHAR(11)      NOT NULL,
@@ -381,7 +372,7 @@ CREATE TABLE tb_folha_pagamento (
   CONSTRAINT fk_folha_func      FOREIGN KEY (fk_cpf_funcionario) REFERENCES tb_funcionarios(pk_fk_cpf)
 );
 
--- Detalha cada verba (provento ou desconto) da folha
+
 CREATE TABLE tb_verbas (
   pk_verba INT         NOT NULL AUTO_INCREMENT,
   nome     VARCHAR(50) NOT NULL,
@@ -390,7 +381,7 @@ CREATE TABLE tb_verbas (
   CONSTRAINT uq_verbas UNIQUE      (nome)
 );
 
--- PK composta — uma verba não pode aparecer duas vezes na mesma folha
+
 CREATE TABLE tb_folha_verbas (
   fk_folha INT           NOT NULL,
   fk_verba INT           NOT NULL,
@@ -400,7 +391,7 @@ CREATE TABLE tb_folha_verbas (
   CONSTRAINT fk_fv_verba     FOREIGN KEY (fk_verba) REFERENCES tb_verbas(pk_verba)
 );
 
--- Férias — CLT permite fracionamento em até 3 períodos
+
 CREATE TABLE tb_ferias (
   pk_ferias          INT         NOT NULL AUTO_INCREMENT,
   fk_cpf_funcionario CHAR(11)    NOT NULL,
@@ -448,7 +439,7 @@ CREATE TABLE tb_contratos_educacionais (
   CONSTRAINT fk_cont_aluno             FOREIGN KEY (fk_cpf_aluno) REFERENCES tb_alunos(pk_fk_cpf)
 );
 
--- RN14: pelo menos um dos campos de desconto deve estar preenchido
+
 CREATE TABLE tb_descontos_bolsas (
   pk_desconto         INT           NOT NULL AUTO_INCREMENT,
   fk_contrato         INT           NOT NULL,
