@@ -21,7 +21,7 @@ Relatórios de médias e faltas são gerados em tempo real a partir de tb_notas,
 
 # IA — Inteligência Artificial
 A camada de IA utiliza os dados históricos e a integridade referencial do schema para realizar análises preventivas em duas frentes principais:
-Previsão de evasão escolar.
+Previão de evasão escolar.
 
 Algoritmos analisam padrões em tb_faltas (frequência e quantidade de faltas ao longo do tempo) cruzados com atrasos em tb_mensalidades (fk_status = 'Atrasado'). Caso um aluno apresente comportamento de risco simultâneo nos dois indicadores — alta frequência de faltas e inadimplência recorrente — o sistema alerta a instituição para uma intervenção preventiva, auxiliando o aluno antes que a situação evolua para desistência ou jubilamento.
 Otimização de alocação docente
