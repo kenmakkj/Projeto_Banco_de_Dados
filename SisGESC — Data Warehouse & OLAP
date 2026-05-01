@@ -220,7 +220,7 @@ CREATE TABLE IF NOT EXISTS dim_disciplina (
 
 CREATE TABLE IF NOT EXISTS fato_receita (
     -- Chaves Surrogadas das Dimensões
-    sk_aluno INT,
+    sk_aluno INT,                
     sk_curso INT,
     sk_tempo_vencimento INT,  -- Data de vencimento
     sk_tempo_pagamento INT,   -- Data de pagamento (NULL se não pago)
