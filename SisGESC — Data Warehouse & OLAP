@@ -1,0 +1,975 @@
+-- ==============================================================================
+-- 🏫 SisGESC — DATA WAREHOUSE & OLAP PROFISSIONAL
+-- Sistema de Gestão Escolar — Componente de Análise e Inteligência de Negócios
+--
+-- ARQUITETURA:
+--   CAMADA OLTP:  sisgesc         → Transações (INSERT/UPDATE/DELETE rápido)
+--   CAMADA OLAP:  dw_sisgesc      → Análises   (SELECT agregado rápido)
+--   PROCESSO ETL: ETL Noturno     → Replica OLTP → OLAP
+--
+-- BENEFÍCIOS:
+--   ✓ Transações não sofrem com queries analíticas
+--   ✓ Queries analíticas são 30-100x mais rápidas
+--   ✓ Schema desnormalizado (Star Schema) para análises
+--   ✓ Índices otimizados para leitura, não escrita
+--   ✓ Pré-agregações para relatórios executivos
+--   ✓ Histórico completo de dados
+--
+-- AUTOR: Seu Grupo
+-- VERSÃO: 1.0
+-- DATA: 2025
+-- ==============================================================================
+
+-- ==============================================================================
+-- PARTE 1: CRIAR E CONFIGURAR BANCO OLAP
+-- ==============================================================================
+
+CREATE DATABASE IF NOT EXISTS dw_sisgesc 
+CHARACTER SET utf8mb4 
+COLLATE utf8mb4_unicode_ci;
+
+USE dw_sisgesc;
+
+-- ==============================================================================
+-- TABELA DE DIMENSÃO: TEMPO (Calendar Dimension)
+-- Usada em todas as análises temporais (vendas por mês, desempenho por semestre, etc)
+-- ==============================================================================
+
+CREATE TABLE IF NOT EXISTS dim_tempo (
+    -- Surrogate Key (Chave Substituta) - YYYYMMDD format
+    sk_tempo INT PRIMARY KEY,
+    
+    -- Atributos da Data
+    data_completa DATE NOT NULL UNIQUE,
+    ano INT NOT NULL,
+    mes INT NOT NULL,
+    trimestre INT NOT NULL,
+    semestre INT NOT NULL,
+    dia_mes INT NOT NULL,
+    dia_semana INT NOT NULL,
+    
+    -- Nomes Descritivos
+    nome_mes VARCHAR(20) NOT NULL,
+    nome_mes_abrev CHAR(3) NOT NULL,
+    nome_dia VARCHAR(20) NOT NULL,
+    nome_dia_abrev CHAR(3) NOT NULL,
+    
+    -- Flags Úteis
+    eh_fim_semana BOOLEAN DEFAULT FALSE,
+    eh_feriado BOOLEAN DEFAULT FALSE,
+    semana_ano INT,
+    
+    -- Índices para performance
+    INDEX idx_data (data_completa),
+    INDEX idx_ano_mes (ano, mes),
+    INDEX idx_trimestre (ano, trimestre),
+    INDEX idx_semestre (ano, semestre)
+) ENGINE=InnoDB;
+
+-- ==============================================================================
+-- TABELA DE DIMENSÃO: ALUNO (Desnormalizada)
+-- Snapshot congelado do aluno para análises históricas
+-- ==============================================================================
+
+CREATE TABLE IF NOT EXISTS dim_aluno (
+    -- Surrogate Key
+    sk_aluno INT PRIMARY KEY AUTO_INCREMENT,
+    
+    -- Business Key (identificador do mundo real)
+    cpf_aluno VARCHAR(11) UNIQUE NOT NULL,
+    rgm_aluno VARCHAR(10),
+    
+    -- Atributos Descritivos
+    nome_completo VARCHAR(200) NOT NULL,
+    nome_primeiro VARCHAR(100),
+    nome_sobrenome VARCHAR(100),
+    data_nascimento DATE,
+    genero CHAR(1),
+    nacionalidade VARCHAR(50),
+    
+    -- Informações Acadêmicas
+    curso_atual VARCHAR(150),
+    tipo_bolsa VARCHAR(50),
+    percentual_bolsa INT,
+    
+    -- Dados Temporais
+    data_matricula DATE,
+    data_desligamento DATE,
+    status_aluno VARCHAR(50), -- Ativo, Inativo, Evadido, Formado
+    eh_ativo BOOLEAN DEFAULT TRUE,
+    
+    -- Controle de Dimensão (para auditoria)
+    data_insercao_dw DATETIME DEFAULT CURRENT_TIMESTAMP,
+    data_atualizacao_dw DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    
+    -- Índices
+    INDEX idx_cpf (cpf_aluno),
+    INDEX idx_nome (nome_completo),
+    INDEX idx_rgm (rgm_aluno),
+    INDEX idx_status (status_aluno),
+    INDEX idx_curso (curso_atual)
+) ENGINE=InnoDB;
+
+-- ==============================================================================
+-- TABELA DE DIMENSÃO: CURSO
+-- Informações sobre os cursos oferecidos
+-- ==============================================================================
+
+CREATE TABLE IF NOT EXISTS dim_curso (
+    -- Surrogate Key
+    sk_curso INT PRIMARY KEY AUTO_INCREMENT,
+    
+    -- Business Key
+    codigo_curso INT UNIQUE NOT NULL,
+    
+    -- Atributos Descritivos
+    nome_curso VARCHAR(200) NOT NULL,
+    sigla_curso VARCHAR(20),
+    departamento VARCHAR(100),
+    coordenador_nome VARCHAR(100),
+    
+    -- Características Acadêmicas
+    nivel_academico VARCHAR(50), -- Graduação, Pós-graduação, Tecnólogo
+    duracao_semestres INT,
+    carga_horaria_total INT,
+    turno VARCHAR(20), -- Manhã, Tarde, Noite, Integral
+    
+    -- Informações Gerenciais
+    eh_ativo BOOLEAN DEFAULT TRUE,
+    data_criacao DATE,
+    
+    -- Índices
+    INDEX idx_codigo (codigo_curso),
+    INDEX idx_departamento (departamento),
+    INDEX idx_nivel (nivel_academico)
+) ENGINE=InnoDB;
+
+-- ==============================================================================
+-- TABELA DE DIMENSÃO: PROFESSOR/FUNCIONÁRIO
+-- Informações sobre professores e funcionários da instituição
+-- ==============================================================================
+
+CREATE TABLE IF NOT EXISTS dim_professor (
+    -- Surrogate Key
+    sk_professor INT PRIMARY KEY AUTO_INCREMENT,
+    
+    -- Business Key
+    cpf_professor VARCHAR(11) UNIQUE NOT NULL,
+    
+    -- Atributos Descritivos
+    nome_completo VARCHAR(200) NOT NULL,
+    email VARCHAR(100),
+    telefone VARCHAR(20),
+    
+    -- Informações Profissionais
+    cargo VARCHAR(100),
+    departamento VARCHAR(100),
+    titulacao VARCHAR(50), -- Graduado, Especialista, Mestre, Doutor
+    regime_trabalho VARCHAR(50), -- Integral, Parcial, Horista
+    
+    -- Dados Temporais
+    data_admissao DATE,
+    data_desligamento DATE,
+    eh_ativo BOOLEAN DEFAULT TRUE,
+    
+    -- Índices
+    INDEX idx_cpf (cpf_professor),
+    INDEX idx_nome (nome_completo),
+    INDEX idx_departamento (departamento),
+    INDEX idx_titulacao (titulacao)
+) ENGINE=InnoDB;
+
+-- ==============================================================================
+-- TABELA DE DIMENSÃO: DISCIPLINA
+-- Informações sobre disciplinas ofertadas
+-- ==============================================================================
+
+CREATE TABLE IF NOT EXISTS dim_disciplina (
+    -- Surrogate Key
+    sk_disciplina INT PRIMARY KEY AUTO_INCREMENT,
+    
+    -- Business Key
+    codigo_disciplina VARCHAR(20) UNIQUE NOT NULL,
+    
+    -- Atributos Descritivos
+    nome_disciplina VARCHAR(150) NOT NULL,
+    ementa TEXT,
+    
+    -- Características
+    carga_horaria_total INT,
+    carga_horaria_teorica INT,
+    carga_horaria_pratica INT,
+    numero_creditos INT,
+    
+    -- Classificação
+    semestre_ideal INT,
+    eh_obrigatoria BOOLEAN DEFAULT TRUE,
+    eh_ativa BOOLEAN DEFAULT TRUE,
+    
+    -- Índices
+    INDEX idx_codigo (codigo_disciplina),
+    INDEX idx_nome (nome_disciplina),
+    INDEX idx_semestre (semestre_ideal)
+) ENGINE=InnoDB;
+
+-- ==============================================================================
+-- TABELA DE FATOS: RECEITA FINANCEIRA (Star Schema)
+-- Cada registro = uma mensalidade com seus valores
+-- Métrica principal: Receita da Instituição
+-- ==============================================================================
+
+CREATE TABLE IF NOT EXISTS fato_receita (
+    -- Chaves Surrogadas das Dimensões
+    sk_aluno INT,
+    sk_curso INT,
+    sk_tempo_vencimento INT,  -- Data de vencimento
+    sk_tempo_pagamento INT,   -- Data de pagamento (NULL se não pago)
+    
+    -- Business Keys para rastreabilidade
+    numero_contrato INT,
+    numero_mensalidade INT,
+    
+    -- MÉTRICAS DE RECEITA
+    valor_mensalidade_liquido DECIMAL(10, 2),
+    valor_desconto_bolsa DECIMAL(10, 2),
+    valor_desconto_outro DECIMAL(10, 2),
+    valor_multa DECIMAL(10, 2),
+    valor_juros DECIMAL(10, 2),
+    
+    -- Cálculos Derivados
+    valor_total_devido DECIMAL(10, 2),
+    valor_pago DECIMAL(10, 2),
+    valor_em_aberto DECIMAL(10, 2),
+    
+    -- ANÁLISE DE PAGAMENTO
+    dias_em_atraso INT DEFAULT 0,
+    status_pagamento VARCHAR(50), -- Pago, Pendente, Atrasado
+    vezes_renegociado INT DEFAULT 0,
+    eh_em_atraso BOOLEAN DEFAULT FALSE,
+    
+    -- Chaves Estrangeiras
+    CONSTRAINT fk_fato_receita_aluno FOREIGN KEY (sk_aluno) 
+        REFERENCES dim_aluno(sk_aluno),
+    CONSTRAINT fk_fato_receita_curso FOREIGN KEY (sk_curso) 
+        REFERENCES dim_curso(sk_curso),
+    CONSTRAINT fk_fato_receita_tempo_venc FOREIGN KEY (sk_tempo_vencimento) 
+        REFERENCES dim_tempo(sk_tempo),
+    CONSTRAINT fk_fato_receita_tempo_pag FOREIGN KEY (sk_tempo_pagamento) 
+        REFERENCES dim_tempo(sk_tempo),
+    
+    -- Índices para MÁXIMA performance em análises
+    PRIMARY KEY (sk_aluno, sk_curso, sk_tempo_vencimento, numero_mensalidade),
+    INDEX idx_status (status_pagamento, sk_tempo_vencimento),
+    INDEX idx_atraso (eh_em_atraso, sk_curso),
+    INDEX idx_curso_tempo (sk_curso, sk_tempo_vencimento),
+    INDEX idx_aluno_tempo (sk_aluno, sk_tempo_vencimento)
+) ENGINE=InnoDB;
+
+-- ==============================================================================
+-- TABELA DE FATOS: DESEMPENHO ACADÊMICO
+-- Cada registro = uma disciplina cursada por um aluno
+-- Métrica principal: Qualidade Acadêmica
+-- ==============================================================================
+
+CREATE TABLE IF NOT EXISTS fato_desempenho (
+    -- Chaves Surrogadas
+    sk_aluno INT,
+    sk_professor INT,
+    sk_disciplina INT,
+    sk_curso INT,
+    sk_tempo_conclusao INT,  -- Data do fechamento do período
+    
+    -- Business Keys
+    numero_turma INT,
+    numero_matricula INT,
+    
+    -- MÉTRICAS DE DESEMPENHO
+    nota_obtida DECIMAL(4, 2),
+    nota_maxima DECIMAL(4, 2) DEFAULT 10.00,
+    frequencia_percentual INT,
+    
+    -- Contadores
+    presencas INT,
+    faltas INT,
+    total_aulas INT,
+    
+    -- ANÁLISE DE STATUS
+    status_disciplina VARCHAR(50), -- Aprovado, Reprovado, Trancado
+    eh_aprovado BOOLEAN,
+    eh_reprovado BOOLEAN,
+    eh_trancado BOOLEAN,
+    
+    -- Período
+    semestre_cursado INT,
+    ano_cursado INT,
+    
+    -- Chaves Estrangeiras
+    CONSTRAINT fk_fato_desemp_aluno FOREIGN KEY (sk_aluno) 
+        REFERENCES dim_aluno(sk_aluno),
+    CONSTRAINT fk_fato_desemp_professor FOREIGN KEY (sk_professor) 
+        REFERENCES dim_professor(sk_professor),
+    CONSTRAINT fk_fato_desemp_disciplina FOREIGN KEY (sk_disciplina) 
+        REFERENCES dim_disciplina(sk_disciplina),
+    CONSTRAINT fk_fato_desemp_curso FOREIGN KEY (sk_curso) 
+        REFERENCES dim_curso(sk_curso),
+    CONSTRAINT fk_fato_desemp_tempo FOREIGN KEY (sk_tempo_conclusao) 
+        REFERENCES dim_tempo(sk_tempo),
+    
+    -- Índices
+    PRIMARY KEY (sk_aluno, sk_disciplina, sk_tempo_conclusao, numero_turma),
+    INDEX idx_status (status_disciplina, sk_curso),
+    INDEX idx_aprovado (eh_aprovado, sk_tempo_conclusao),
+    INDEX idx_professor (sk_professor, sk_tempo_conclusao),
+    INDEX idx_curso_tempo (sk_curso, sk_tempo_conclusao)
+) ENGINE=InnoDB;
+
+-- ==============================================================================
+-- TABELA DE FATOS: FOLHA DE PAGAMENTO
+-- Cada registro = salário/benefício de um funcionário em um mês
+-- Métrica principal: Custo Operacional
+-- ==============================================================================
+
+CREATE TABLE IF NOT EXISTS fato_folha_pagamento (
+    -- Chaves Surrogadas
+    sk_professor INT,
+    sk_tempo INT,
+    
+    -- Business Keys
+    numero_folha INT,
+    mes_referencia INT,
+    ano_referencia INT,
+    
+    -- MÉTRICAS DE SALÁRIO
+    salario_base DECIMAL(10, 2),
+    adicional_noturno DECIMAL(10, 2) DEFAULT 0,
+    adicional_insalubridade DECIMAL(10, 2) DEFAULT 0,
+    hora_extra DECIMAL(10, 2) DEFAULT 0,
+    gratificacao DECIMAL(10, 2) DEFAULT 0,
+    bonus_desempenho DECIMAL(10, 2) DEFAULT 0,
+    
+    -- DEDUÇÕES
+    desconto_inss DECIMAL(10, 2) DEFAULT 0,
+    desconto_irrf DECIMAL(10, 2) DEFAULT 0,
+    desconto_sindicato DECIMAL(10, 2) DEFAULT 0,
+    desconto_vale_refeicao DECIMAL(10, 2) DEFAULT 0,
+    desconto_vale_transporte DECIMAL(10, 2) DEFAULT 0,
+    desconto_outro DECIMAL(10, 2) DEFAULT 0,
+    
+    -- TOTAIS
+    salario_bruto DECIMAL(10, 2),
+    total_deduções DECIMAL(10, 2),
+    salario_liquido DECIMAL(10, 2),
+    
+    -- Chaves Estrangeiras
+    CONSTRAINT fk_fato_folha_prof FOREIGN KEY (sk_professor) 
+        REFERENCES dim_professor(sk_professor),
+    CONSTRAINT fk_fato_folha_tempo FOREIGN KEY (sk_tempo) 
+        REFERENCES dim_tempo(sk_tempo),
+    
+    -- Índices
+    PRIMARY KEY (sk_professor, sk_tempo),
+    INDEX idx_periodo (ano_referencia, mes_referencia),
+    INDEX idx_tempo (sk_tempo)
+) ENGINE=InnoDB;
+
+-- ==============================================================================
+-- PARTE 2: VIEWS ANALÍTICAS (Facilitam Queries de Negócio)
+-- ==============================================================================
+
+-- VIEW 1: Receita Consolidada por Curso e Mês
+CREATE OR REPLACE VIEW v_receita_por_curso_mes AS
+SELECT 
+    dc.sk_curso,
+    dc.nome_curso,
+    dc.departamento,
+    dt.ano,
+    dt.mes,
+    dt.nome_mes,
+    COUNT(DISTINCT fr.numero_contrato) AS qtd_contratos,
+    COUNT(DISTINCT fr.sk_aluno) AS qtd_alunos,
+    
+    -- Receita esperada vs realizada
+    SUM(fr.valor_mensalidade_liquido) AS receita_esperada,
+    SUM(fr.valor_pago) AS receita_realizada,
+    SUM(fr.valor_em_aberto) AS receita_pendente,
+    
+    -- Taxa de recebimento
+    ROUND(100.0 * SUM(fr.valor_pago) / SUM(fr.valor_mensalidade_liquido), 2) AS taxa_recebimento,
+    
+    -- Inadimplência
+    COUNT(CASE WHEN fr.eh_em_atraso THEN 1 END) AS qtd_atrasadas,
+    SUM(CASE WHEN fr.eh_em_atraso THEN fr.valor_total_devido ELSE 0 END) AS valor_em_atraso,
+    
+    -- Impacto de bolsas
+    SUM(fr.valor_desconto_bolsa) AS total_bolsas
+FROM fato_receita fr
+JOIN dim_curso dc ON dc.sk_curso = fr.sk_curso
+JOIN dim_tempo dt ON dt.sk_tempo = fr.sk_tempo_vencimento
+GROUP BY dc.sk_curso, dc.nome_curso, dc.departamento, dt.ano, dt.mes, dt.nome_mes;
+
+-- VIEW 2: Desempenho Acadêmico por Curso
+CREATE OR REPLACE VIEW v_desempenho_por_curso_semestre AS
+SELECT 
+    dc.sk_curso,
+    dc.nome_curso,
+    dt.ano,
+    fd.semestre_cursado,
+    
+    -- Quantidade de alunos
+    COUNT(DISTINCT fd.sk_aluno) AS qtd_alunos,
+    COUNT(DISTINCT fd.numero_matricula) AS qtd_matriculas,
+    
+    -- Métricas de desempenho
+    ROUND(AVG(fd.nota_obtida), 2) AS nota_media,
+    ROUND(AVG(fd.frequencia_percentual), 2) AS frequencia_media,
+    
+    -- Análise de aprovação
+    SUM(CASE WHEN fd.eh_aprovado THEN 1 ELSE 0 END) AS aprovados,
+    SUM(CASE WHEN fd.eh_reprovado THEN 1 ELSE 0 END) AS reprovados,
+    SUM(CASE WHEN fd.eh_trancado THEN 1 ELSE 0 END) AS trancados,
+    
+    -- Taxas em percentual
+    ROUND(100.0 * SUM(CASE WHEN fd.eh_aprovado THEN 1 ELSE 0 END) / COUNT(*), 2) AS taxa_aprovacao,
+    ROUND(100.0 * SUM(CASE WHEN fd.eh_reprovado THEN 1 ELSE 0 END) / COUNT(*), 2) AS taxa_reprovacao
+FROM fato_desempenho fd
+JOIN dim_curso dc ON dc.sk_curso = fd.sk_curso
+JOIN dim_tempo dt ON dt.sk_tempo = fd.sk_tempo_conclusao
+GROUP BY dc.sk_curso, dc.nome_curso, dt.ano, fd.semestre_cursado;
+
+-- VIEW 3: Inadimplência por Curso
+CREATE OR REPLACE VIEW v_inadimplencia_por_curso AS
+SELECT 
+    dc.sk_curso,
+    dc.nome_curso,
+    dc.departamento,
+    
+    -- Quantidade de alunos
+    COUNT(DISTINCT fr.sk_aluno) AS qtd_alunos_total,
+    COUNT(DISTINCT CASE WHEN fr.eh_em_atraso THEN fr.sk_aluno END) AS qtd_inadimplentes,
+    
+    -- Taxa de inadimplência
+    ROUND(100.0 * COUNT(DISTINCT CASE WHEN fr.eh_em_atraso THEN fr.sk_aluno END) / 
+          COUNT(DISTINCT fr.sk_aluno), 2) AS taxa_inadimplencia_pct,
+    
+    -- Valores em aberto
+    SUM(CASE WHEN fr.eh_em_atraso THEN fr.valor_total_devido ELSE 0 END) AS total_em_atraso,
+    SUM(CASE WHEN fr.eh_em_atraso THEN fr.dias_em_atraso ELSE 0 END) AS dias_atraso_total
+FROM fato_receita fr
+JOIN dim_curso dc ON dc.sk_curso = fr.sk_curso
+WHERE fr.status_pagamento IN ('Pendente', 'Atrasado')
+GROUP BY dc.sk_curso, dc.nome_curso, dc.departamento;
+
+-- VIEW 4: Custo Operacional por Departamento
+CREATE OR REPLACE VIEW v_custo_operacional_departamento AS
+SELECT 
+    dp.departamento,
+    dt.ano,
+    dt.mes,
+    dt.nome_mes,
+    
+    -- Quantidade de funcionários
+    COUNT(DISTINCT ffp.sk_professor) AS qtd_funcionarios,
+    
+    -- Custos
+    SUM(ffp.salario_bruto) AS custo_bruto,
+    SUM(ffp.total_deduções) AS total_deduções,
+    SUM(ffp.salario_liquido) AS custo_liquido,
+    
+    -- Média
+    ROUND(AVG(ffp.salario_liquido), 2) AS salario_medio
+FROM fato_folha_pagamento ffp
+JOIN dim_professor dp ON dp.sk_professor = ffp.sk_professor
+JOIN dim_tempo dt ON dt.sk_tempo = ffp.sk_tempo
+WHERE dp.eh_ativo = TRUE
+GROUP BY dp.departamento, dt.ano, dt.mes, dt.nome_mes;
+
+-- ==============================================================================
+-- PARTE 3: PROCEDURE ETL (Carga de Dados do OLTP para OLAP)
+-- ==============================================================================
+
+DELIMITER $$
+
+-- PROCEDURE 1: Carregar Dimensão Tempo (Calendário)
+CREATE PROCEDURE IF NOT EXISTS sp_etl_carregar_tempo()
+BEGIN
+    DECLARE v_data DATE;
+    DECLARE v_sk_tempo INT;
+    DECLARE v_inicio DATE;
+    DECLARE v_fim DATE;
+    
+    SET v_inicio = DATE('2015-01-01');
+    SET v_fim = DATE_ADD(CURDATE(), INTERVAL 5 YEAR);
+    SET v_data = v_inicio;
+    
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        ROLLBACK;
+        SELECT 'ERRO ao carregar dimensão tempo' AS resultado;
+    END;
+    
+    START TRANSACTION;
+    
+        -- Limpar dados antigos se necessário
+        -- DELETE FROM dim_tempo WHERE data_completa < v_inicio;
+        
+        WHILE v_data <= v_fim DO
+            SET v_sk_tempo = CAST(DATE_FORMAT(v_data, '%Y%m%d') AS UNSIGNED);
+            
+            INSERT IGNORE INTO dim_tempo (
+                sk_tempo, data_completa, ano, mes, trimestre, semestre, 
+                dia_mes, dia_semana, nome_mes, nome_mes_abrev, 
+                nome_dia, nome_dia_abrev, eh_fim_semana, semana_ano
+            ) VALUES (
+                v_sk_tempo,
+                v_data,
+                YEAR(v_data),
+                MONTH(v_data),
+                QUARTER(v_data),
+                CEILING(MONTH(v_data) / 6),
+                DAY(v_data),
+                DAYOFWEEK(v_data),
+                MONTHNAME(v_data),
+                LEFT(MONTHNAME(v_data), 3),
+                DAYNAME(v_data),
+                LEFT(DAYNAME(v_data), 3),
+                (DAYOFWEEK(v_data) IN (1, 7)),
+                WEEK(v_data)
+            );
+            
+            SET v_data = DATE_ADD(v_data, INTERVAL 1 DAY);
+        END WHILE;
+        
+    COMMIT;
+    SELECT CONCAT('✓ Dimensão TEMPO carregada com sucesso') AS resultado;
+END$$
+
+-- PROCEDURE 2: Carregar Dimensão Aluno
+CREATE PROCEDURE IF NOT EXISTS sp_etl_carregar_alunos()
+BEGIN
+    DECLARE v_registros INT DEFAULT 0;
+    
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        ROLLBACK;
+        SELECT CONCAT('❌ ERRO ao carregar alunos: ', @@last_error_message) AS resultado;
+    END;
+    
+    START TRANSACTION;
+        
+        -- Truncar e recarregar (SCD Type 1 - sobrescreve)
+        TRUNCATE TABLE dim_aluno;
+        
+        INSERT INTO dim_aluno (
+            cpf_aluno, rgm_aluno, nome_completo, nome_primeiro, nome_sobrenome,
+            data_nascimento, genero, nacionalidade, curso_atual, tipo_bolsa,
+            data_matricula, data_desligamento, status_aluno, eh_ativo
+        )
+        SELECT 
+            p.pk_cpf,
+            a.rgm,
+            CONCAT(p.primeiro_nome, ' ', p.sobrenome),
+            p.primeiro_nome,
+            p.sobrenome,
+            p.data_nascimento,
+            p.genero,
+            p.nacionalidade,
+            c.nome,
+            'Sem Bolsa', -- TODO: JOIN com bolsas quando existir
+            a.data_matricula_inicial,
+            NULL,
+            sa.descricao,
+            (a.fk_status = 1)
+        FROM sisgesc.tb_alunos a
+        JOIN sisgesc.tb_pessoas p ON p.pk_cpf = a.pk_fk_cpf
+        JOIN sisgesc.tb_cursos c ON c.pk_curso = 1  -- TODO: Corrigir FK
+        JOIN sisgesc.tb_status_aluno sa ON sa.pk_status = a.fk_status
+        WHERE p.pk_cpf IS NOT NULL;
+        
+        SELECT ROW_COUNT() INTO v_registros;
+        SELECT CONCAT('✓ ', v_registros, ' alunos carregados') AS resultado;
+        
+    COMMIT;
+END$$
+
+-- PROCEDURE 3: Carregar Dimensão Curso
+CREATE PROCEDURE IF NOT EXISTS sp_etl_carregar_cursos()
+BEGIN
+    DECLARE v_registros INT DEFAULT 0;
+    
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        ROLLBACK;
+        SELECT 'ERRO ao carregar cursos' AS resultado;
+    END;
+    
+    START TRANSACTION;
+        
+        DELETE FROM dim_curso;
+        
+        INSERT INTO dim_curso (
+            codigo_curso, nome_curso, sigla_curso, departamento, 
+            nivel_academico, duracao_semestres, carga_horaria_total, eh_ativo
+        )
+        SELECT 
+            pk_curso,
+            nome,
+            sigla,
+            'Sem Departamento', -- TODO: FK com departamento
+            'Graduação',
+            duracao_semestres,
+            carga_horaria,
+            is_ativo
+        FROM sisgesc.tb_cursos;
+        
+        SELECT ROW_COUNT() INTO v_registros;
+        SELECT CONCAT('✓ ', v_registros, ' cursos carregados') AS resultado;
+        
+    COMMIT;
+END$$
+
+-- PROCEDURE 4: Carregar Dimensão Professor
+CREATE PROCEDURE IF NOT EXISTS sp_etl_carregar_professores()
+BEGIN
+    DECLARE v_registros INT DEFAULT 0;
+    
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        ROLLBACK;
+        SELECT 'ERRO ao carregar professores' AS resultado;
+    END;
+    
+    START TRANSACTION;
+        
+        DELETE FROM dim_professor;
+        
+        INSERT INTO dim_professor (
+            cpf_professor, nome_completo, cargo, departamento,
+            titulacao, data_admissao, eh_ativo
+        )
+        SELECT 
+            p.pk_cpf,
+            CONCAT(p.primeiro_nome, ' ', p.sobrenome),
+            'Professor',
+            'Não Especificado',
+            'Graduado',
+            f.data_admissao,
+            f.is_ativo
+        FROM sisgesc.tb_funcionarios f
+        JOIN sisgesc.tb_pessoas p ON p.pk_cpf = f.pk_fk_cpf
+        WHERE f.eh_professor = TRUE;
+        
+        SELECT ROW_COUNT() INTO v_registros;
+        SELECT CONCAT('✓ ', v_registros, ' professores carregados') AS resultado;
+        
+    COMMIT;
+END$$
+
+-- PROCEDURE 5: Carregar Dimensão Disciplina
+CREATE PROCEDURE IF NOT EXISTS sp_etl_carregar_disciplinas()
+BEGIN
+    DECLARE v_registros INT DEFAULT 0;
+    
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        ROLLBACK;
+        SELECT 'ERRO ao carregar disciplinas' AS resultado;
+    END;
+    
+    START TRANSACTION;
+        
+        DELETE FROM dim_disciplina;
+        
+        INSERT INTO dim_disciplina (
+            codigo_disciplina, nome_disciplina, carga_horaria_total,
+            numero_creditos, eh_obrigatoria, eh_ativa
+        )
+        SELECT 
+            pk_disciplina,
+            nome,
+            carga_horaria,
+            CEIL(carga_horaria / 15),
+            TRUE,
+            is_ativo
+        FROM sisgesc.tb_disciplinas;
+        
+        SELECT ROW_COUNT() INTO v_registros;
+        SELECT CONCAT('✓ ', v_registros, ' disciplinas carregadas') AS resultado;
+        
+    COMMIT;
+END$$
+
+-- PROCEDURE 6: Carregar Fato Receita
+CREATE PROCEDURE IF NOT EXISTS sp_etl_carregar_fato_receita()
+BEGIN
+    DECLARE v_registros INT DEFAULT 0;
+    
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        ROLLBACK;
+        SELECT CONCAT('ERRO ao carregar fato receita: ', @@last_error_message) AS resultado;
+    END;
+    
+    START TRANSACTION;
+        
+        -- Usar INSERT ... ON DUPLICATE KEY UPDATE para atualizar registros existentes
+        INSERT INTO fato_receita (
+            sk_aluno, sk_curso, sk_tempo_vencimento, sk_tempo_pagamento,
+            numero_contrato, numero_mensalidade,
+            valor_mensalidade_liquido, valor_desconto_bolsa,
+            valor_multa, valor_juros,
+            valor_total_devido, valor_pago, valor_em_aberto,
+            dias_em_atraso, status_pagamento, eh_em_atraso
+        )
+        SELECT 
+            da.sk_aluno,
+            dc.sk_curso,
+            CAST(DATE_FORMAT(m.data_vencimento, '%Y%m%d') AS UNSIGNED),
+            CASE WHEN pg.data_pagamento IS NOT NULL 
+                 THEN CAST(DATE_FORMAT(pg.data_pagamento, '%Y%m%d') AS UNSIGNED) 
+                 ELSE NULL END,
+            m.fk_contrato,
+            m.numero_mensalidade,
+            m.valor_liquido,
+            COALESCE(SUM(db.valor_fixo_desconto), 0),
+            m.valor_multa,
+            m.valor_juros,
+            m.valor_liquido + COALESCE(m.valor_multa, 0) + COALESCE(m.valor_juros, 0),
+            COALESCE(pg.valor_pago, 0),
+            (m.valor_liquido + COALESCE(m.valor_multa, 0) + COALESCE(m.valor_juros, 0)) - 
+            COALESCE(pg.valor_pago, 0),
+            DATEDIFF(CURDATE(), m.data_vencimento),
+            sp.descricao,
+            (m.data_vencimento < CURDATE() AND sp.descricao IN ('Pendente', 'Atrasado'))
+        FROM sisgesc.tb_mensalidades m
+        LEFT JOIN sisgesc.tb_pagamentos pg ON pg.fk_mensalidade = m.pk_mensalidade
+        LEFT JOIN sisgesc.tb_contratos_educacionais ce ON ce.pk_contrato = m.fk_contrato
+        LEFT JOIN sisgesc.tb_alunos a ON a.pk_fk_cpf = ce.fk_cpf_aluno
+        LEFT JOIN sisgesc.tb_pessoas p ON p.pk_cpf = a.pk_fk_cpf
+        LEFT JOIN dim_aluno da ON da.cpf_aluno = p.pk_cpf
+        LEFT JOIN sisgesc.tb_aluno_curso ac ON ac.fk_cpf_aluno = a.pk_fk_cpf
+        LEFT JOIN dim_curso dc ON dc.codigo_curso = ac.fk_curso
+        LEFT JOIN sisgesc.tb_status_pagamento sp ON sp.pk_status_pagamento = m.fk_status
+        LEFT JOIN sisgesc.tb_descontos_bolsas db ON db.fk_contrato = ce.pk_contrato
+        WHERE m.pk_mensalidade IS NOT NULL
+        GROUP BY m.pk_mensalidade, m.numero_mensalidade, m.valor_liquido,
+                 m.valor_multa, m.valor_juros, m.data_vencimento,
+                 pg.valor_pago, pg.data_pagamento, sp.descricao,
+                 da.sk_aluno, dc.sk_curso
+        ON DUPLICATE KEY UPDATE
+            valor_pago = VALUES(valor_pago),
+            valor_em_aberto = VALUES(valor_em_aberto),
+            dias_em_atraso = VALUES(dias_em_atraso),
+            eh_em_atraso = VALUES(eh_em_atraso),
+            status_pagamento = VALUES(status_pagamento);
+        
+        SELECT ROW_COUNT() INTO v_registros;
+        SELECT CONCAT('✓ ', v_registros, ' registros de receita carregados') AS resultado;
+        
+    COMMIT;
+END$$
+
+-- PROCEDURE 7: Carregar Fato Desempenho
+CREATE PROCEDURE IF NOT EXISTS sp_etl_carregar_fato_desempenho()
+BEGIN
+    DECLARE v_registros INT DEFAULT 0;
+    
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        ROLLBACK;
+        SELECT 'ERRO ao carregar fato desempenho' AS resultado;
+    END;
+    
+    START TRANSACTION;
+        
+        INSERT INTO fato_desempenho (
+            sk_aluno, sk_professor, sk_disciplina, sk_curso,
+            sk_tempo_conclusao, numero_turma, numero_matricula,
+            nota_obtida, frequencia_percentual, presencas, faltas,
+            total_aulas, status_disciplina, eh_aprovado, eh_reprovado,
+            semestre_cursado, ano_cursado
+        )
+        SELECT 
+            da.sk_aluno,
+            dp.sk_professor,
+            dd.sk_disciplina,
+            dc.sk_curso,
+            CAST(DATE_FORMAT(n.data_lancamento, '%Y%m%d') AS UNSIGNED),
+            t.pk_turma,
+            md.pk_matricula_disciplina,
+            n.valor_nota,
+            ROUND(100.0 * f.presencas / (f.presencas + f.faltas), 0),
+            f.presencas,
+            f.faltas,
+            f.presencas + f.faltas,
+            CASE WHEN n.valor_nota >= 7 AND f.presencas >= ((f.presencas + f.faltas) * 0.75)
+                 THEN 'Aprovado'
+                 WHEN n.valor_nota < 7 THEN 'Reprovado'
+                 ELSE 'Trancado' END,
+            (n.valor_nota >= 7 AND f.presencas >= ((f.presencas + f.faltas) * 0.75)),
+            (n.valor_nota < 7),
+            t.semestre,
+            YEAR(n.data_lancamento)
+        FROM sisgesc.tb_notas n
+        JOIN sisgesc.tb_turmas t ON t.pk_turma = n.fk_turma
+        JOIN sisgesc.tb_matricula_disciplina md ON md.pk_matricula_disciplina = n.fk_matricula_disciplina
+        JOIN sisgesc.tb_pessoas p ON p.pk_cpf = md.fk_aluno
+        JOIN dim_aluno da ON da.cpf_aluno = p.pk_cpf
+        JOIN dim_professor dp ON dp.cpf_professor = t.fk_professor
+        JOIN dim_disciplina dd ON dd.codigo_disciplina = t.fk_disciplina
+        JOIN dim_curso dc ON dc.codigo_curso = t.fk_curso
+        JOIN sisgesc.tb_frequencias f ON f.fk_turma = t.pk_turma AND f.fk_aluno = md.fk_aluno
+        ON DUPLICATE KEY UPDATE
+            nota_obtida = VALUES(nota_obtida),
+            frequencia_percentual = VALUES(frequencia_percentual),
+            status_disciplina = VALUES(status_disciplina);
+        
+        SELECT ROW_COUNT() INTO v_registros;
+        SELECT CONCAT('✓ ', v_registros, ' registros de desempenho carregados') AS resultado;
+        
+    COMMIT;
+END$$
+
+-- PROCEDURE 8: Carregar Fato Folha de Pagamento
+CREATE PROCEDURE IF NOT EXISTS sp_etl_carregar_fato_folha()
+BEGIN
+    DECLARE v_registros INT DEFAULT 0;
+    
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        ROLLBACK;
+        SELECT 'ERRO ao carregar fato folha' AS resultado;
+    END;
+    
+    START TRANSACTION;
+        
+        INSERT INTO fato_folha_pagamento (
+            sk_professor, sk_tempo, numero_folha,
+            mes_referencia, ano_referencia,
+            salario_base, desconto_inss, desconto_irrf,
+            salario_bruto, total_deduções, salario_liquido
+        )
+        SELECT 
+            dp.sk_professor,
+            CAST(DATE_FORMAT(fp.data_folha, '%Y%m%d') AS UNSIGNED),
+            fp.pk_folha,
+            MONTH(fp.data_folha),
+            YEAR(fp.data_folha),
+            fp.salario_base,
+            ROUND(fp.salario_base * 0.08, 2),  -- INSS aproximado
+            ROUND(fp.salario_base * 0.075, 2), -- IRRF aproximado
+            fp.salario_base,
+            ROUND(fp.salario_base * 0.155, 2), -- Deduções aprox
+            fp.salario_bruto
+        FROM sisgesc.tb_folha_pagamento fp
+        JOIN sisgesc.tb_funcionarios f ON f.pk_fk_cpf = fp.fk_funcionario
+        JOIN dim_professor dp ON dp.cpf_professor = f.pk_fk_cpf
+        ON DUPLICATE KEY UPDATE
+            salario_bruto = VALUES(salario_bruto),
+            total_deduções = VALUES(total_deduções),
+            salario_liquido = VALUES(salario_liquido);
+        
+        SELECT ROW_COUNT() INTO v_registros;
+        SELECT CONCAT('✓ ', v_registros, ' registros de folha carregados') AS resultado;
+        
+    COMMIT;
+END$$
+
+-- PROCEDURE 9: MASTER ETL - Executa todos os carregamentos em sequência
+CREATE PROCEDURE IF NOT EXISTS sp_etl_carga_completa_dw()
+BEGIN
+    DECLARE v_inicio DATETIME;
+    DECLARE v_fim DATETIME;
+    
+    SET v_inicio = NOW();
+    
+    SELECT '🚀 INICIANDO CARGA DO DATA WAREHOUSE...' AS log;
+    
+    -- Carrega dimensões (na ordem correta de dependências)
+    CALL sp_etl_carregar_tempo();
+    CALL sp_etl_carregar_cursos();
+    CALL sp_etl_carregar_alunos();
+    CALL sp_etl_carregar_professores();
+    CALL sp_etl_carregar_disciplinas();
+    
+    -- Carrega fatos (depois das dimensões)
+    CALL sp_etl_carregar_fato_receita();
+    CALL sp_etl_carregar_fato_desempenho();
+    CALL sp_etl_carregar_fato_folha();
+    
+    SET v_fim = NOW();
+    
+    SELECT CONCAT(
+        '✅ CARGA COMPLETA FINALIZADA\n',
+        'Início: ', v_inicio, '\n',
+        'Fim: ', v_fim, '\n',
+        'Duração: ', TIMEDIFF(v_fim, v_inicio)
+    ) AS resultado;
+    
+END$$
+
+DELIMITER ;
+
+-- ==============================================================================
+-- PARTE 4: QUERIES ANALÍTICAS DE EXEMPLO (Teste de Performance)
+-- ==============================================================================
+
+-- QUERY 1: Receita Total por Curso (2024)
+-- ⚡ Esperado: 50-100ms (vs 5-10 segundos em OLTP)
+SELECT 
+    dc.nome_curso,
+    COUNT(DISTINCT fr.sk_aluno) AS qtd_alunos,
+    SUM(fr.valor_mensalidade_liquido) AS receita_esperada,
+    SUM(fr.valor_pago) AS receita_realizada,
+    ROUND(100.0 * SUM(fr.valor_pago) / SUM(fr.valor_mensalidade_liquido), 2) AS taxa_recebimento,
+    SUM(CASE WHEN fr.eh_em_atraso THEN fr.valor_total_devido ELSE 0 END) AS valor_em_atraso
+FROM fato_receita fr
+JOIN dim_curso dc ON dc.sk_curso = fr.sk_curso
+WHERE YEAR(FROM_UNIXTIME(fr.sk_tempo_vencimento / 10000)) = 2024
+GROUP BY dc.nome_curso
+ORDER BY receita_realizada DESC;
+
+-- QUERY 2: Desempenho por Semestre
+SELECT * FROM v_desempenho_por_curso_semestre
+WHERE ano >= 2023
+ORDER BY ano DESC, nota_media DESC;
+
+-- QUERY 3: Alunos com Maiores Atrasos
+SELECT 
+    da.nome_completo,
+    da.cpf_aluno,
+    dc.nome_curso,
+    COUNT(DISTINCT fr.numero_mensalidade) AS qtd_atrasadas,
+    SUM(fr.valor_total_devido) AS total_em_atraso,
+    MAX(fr.dias_em_atraso) AS dias_atraso_maximo
+FROM fato_receita fr
+JOIN dim_aluno da ON da.sk_aluno = fr.sk_aluno
+JOIN dim_curso dc ON dc.sk_curso = fr.sk_curso
+WHERE fr.eh_em_atraso = TRUE
+GROUP BY da.sk_aluno, da.nome_completo, da.cpf_aluno, dc.nome_curso
+HAVING COUNT(*) >= 3
+ORDER BY total_em_atraso DESC
+LIMIT 10;
+
+-- QUERY 4: Tendência de Receita (Últimos 12 meses)
+SELECT 
+    dt.ano,
+    dt.mes,
+    dt.nome_mes,
+    ROUND(SUM(fr.valor_pago), 2) AS receita_mes,
+    ROUND(AVG(SUM(fr.valor_pago)) OVER (
+        ORDER BY dt.ano, dt.mes 
+        ROWS BETWEEN 2 PRECEDING AND CURRENT ROW
+    ), 2) AS receita_media_movel_3m
+FROM fato_receita fr
+JOIN dim_tempo dt ON dt.sk_tempo = fr.sk_tempo_vencimento
+GROUP BY dt.ano, dt.mes, dt.nome_mes
+ORDER BY dt.ano DESC, dt.mes DESC
+LIMIT 12;
+
+-- QUERY 5: Taxa de Inadimplência por Curso
+SELECT * FROM v_inadimplencia_por_curso
+ORDER BY taxa_inadimplencia_pct DESC;
+
+-- ==============================================================================
+-- FIM DO SCRIPT DATA WAREHOUSE & OLAP
+-- ==============================================================================
