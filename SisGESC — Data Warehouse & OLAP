@@ -321,23 +321,23 @@ GROUP BY dp.departamento, dt.ano, dt.mes, dt.nome_mes;
 
 DELIMITER $$
 
--- Dimensão Tempo
 CREATE PROCEDURE IF NOT EXISTS sp_etl_carregar_tempo()
 BEGIN
+    -- ✅ TODOS os DECLAREs primeiro, inclusive o handler
     DECLARE v_data     DATE;
     DECLARE v_sk_tempo INT;
     DECLARE v_inicio   DATE;
     DECLARE v_fim      DATE;
-
-    SET v_inicio = DATE('2015-01-01');
-    SET v_fim    = DATE_ADD(CURDATE(), INTERVAL 5 YEAR);
-    SET v_data   = v_inicio;
-
     DECLARE EXIT HANDLER FOR SQLEXCEPTION
     BEGIN
         ROLLBACK;
         SELECT 'ERRO ao carregar dimensão tempo' AS resultado;
     END;
+
+    -- ✅ SET só depois de todos os DECLAREs
+    SET v_inicio = DATE('2015-01-01');
+    SET v_fim    = DATE_ADD(CURDATE(), INTERVAL 5 YEAR);
+    SET v_data   = v_inicio;
 
     START TRANSACTION;
         WHILE v_data <= v_fim DO
@@ -372,7 +372,7 @@ BEGIN
         SELECT CONCAT('ERRO ao carregar alunos') AS resultado;
     END;
     START TRANSACTION;
-        TRUNCATE TABLE dim_aluno;
+        DELETE TABLE dim_aluno;
         INSERT INTO dim_aluno (
             cpf_aluno, rgm_aluno, nome_completo, nome_primeiro, nome_sobrenome,
             data_nascimento, genero, nacionalidade, curso_atual, tipo_bolsa,
@@ -540,13 +540,13 @@ BEGIN
         FROM sisgesc.tb_mensalidades m
         LEFT JOIN sisgesc.tb_pagamentos pg
             ON pg.fk_mensalidade = m.pk_mensalidade
-        LEFT JOIN sisgesc.tb_contratos_educacionais ce
+        JOIN sisgesc.tb_contratos_educacionais ce
             ON ce.pk_contrato = m.fk_contrato
-        LEFT JOIN sisgesc.tb_alunos a
+        JOIN sisgesc.tb_alunos a
             ON a.pk_fk_cpf = ce.fk_cpf_aluno
         LEFT JOIN sisgesc.tb_pessoas p
             ON p.pk_cpf = a.pk_fk_cpf
-        LEFT JOIN dim_aluno da
+        JOIN dim_aluno da
             ON da.cpf_aluno = p.pk_cpf
         LEFT JOIN sisgesc.tb_aluno_curso ac
             ON ac.fk_cpf_aluno = a.pk_fk_cpf
@@ -721,7 +721,7 @@ SELECT
     SUM(CASE WHEN fr.eh_em_atraso THEN fr.valor_total_devido ELSE 0 END) AS valor_em_atraso
 FROM fato_receita fr
 JOIN dim_curso dc ON dc.sk_curso = fr.sk_curso
-WHERE YEAR(FROM_UNIXTIME(fr.sk_tempo_vencimento / 10000)) = 2024
+JOIN dim_tempo dt.ano=2024
 GROUP BY dc.nome_curso
 ORDER BY receita_realizada DESC;
 
@@ -748,7 +748,7 @@ SELECT
         ORDER BY dt.ano, dt.mes ROWS BETWEEN 2 PRECEDING AND CURRENT ROW
     ), 2) AS receita_media_movel_3m
 FROM fato_receita fr
-JOIN dim_tempo dt ON dt.sk_tempo = fr.sk_tempo_vencimento
+WHERE YEAR dt ON dt.sk_tempo = fr.sk_tempo_vencimento
 GROUP BY dt.ano, dt.mes, dt.nome_mes
 ORDER BY dt.ano DESC, dt.mes DESC
 LIMIT 12;
