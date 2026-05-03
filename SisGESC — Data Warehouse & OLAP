@@ -721,7 +721,7 @@ SELECT
     SUM(CASE WHEN fr.eh_em_atraso THEN fr.valor_total_devido ELSE 0 END) AS valor_em_atraso
 FROM fato_receita fr
 JOIN dim_curso dc ON dc.sk_curso = fr.sk_curso
-JOIN dim_tempo dt.ano=2024
+WHERE YEAR dt.ano=2024
 GROUP BY dc.nome_curso
 ORDER BY receita_realizada DESC;
 
