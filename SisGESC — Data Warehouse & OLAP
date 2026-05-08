@@ -1,4 +1,3 @@
--- ==============================================================================
 -- SisGESC — DATA WAREHOUSE & OLAP
 -- Sistema de Gestão Escolar — Componente de Análise e Inteligência de Negócios
 --
@@ -447,9 +446,10 @@ BEGIN
             codigo_curso, nome_curso, sigla_curso, departamento,
             nivel_academico, duracao_semestres, carga_horaria_total, eh_ativo
         )
-        SELECT pk_curso, nome, sigla, 'Sem Departamento',
-               'Graduação', duracao_semestres, carga_horaria, is_ativo
-        FROM sisgesc.tb_cursos;
+        SELECT pk_curso, nome, NULL AS sigla, 'Sem Departamento',
+               tc.descricao, NULL AS duracao_semestres, NULL AS carga_horaria, TRUE AS is_ativo
+        FROM sisgesc.tb_cursos c
+        JOIN sisgesc.tb_tipo_curso tc ON tc.pk_tipo_curso = c.fk_tipo_curso;
         SELECT ROW_COUNT() INTO v_registros;
         SELECT CONCAT('✓ ', v_registros, ' cursos carregados') AS resultado;
     COMMIT;
@@ -509,7 +509,7 @@ BEGIN
             numero_creditos, eh_obrigatoria, eh_ativa
         )
         SELECT pk_disciplina, nome, carga_horaria,
-               CEIL(carga_horaria/15), TRUE, is_ativo
+               CEIL(carga_horaria/15), TRUE, TRUE AS is_ativa
         FROM sisgesc.tb_disciplinas;
         SELECT ROW_COUNT() INTO v_registros;
         SELECT CONCAT('✓ ', v_registros, ' disciplinas carregadas') AS resultado;
@@ -628,7 +628,7 @@ BEGIN
             (rm.situacao = 'aprovado'),
             (rm.situacao = 'reprovado'),
             (rm.situacao = 'trancado'),
-            t.semestre,
+            per.semestre,
             YEAR(rm.data_fechamento)
         FROM sisgesc.tb_resultado_matricula rm
         JOIN sisgesc.tb_matriculas m
@@ -637,10 +637,14 @@ BEGIN
             ON d.pk_disciplina = m.fk_disciplina
         JOIN sisgesc.tb_turmas t
             ON t.pk_turma = m.fk_turma
+        JOIN sisgesc.tb_periodos per
+            ON per.pk_periodo = m.fk_periodo
         JOIN sisgesc.tb_alunos a
             ON a.pk_fk_cpf = m.fk_cpf_aluno
+        JOIN sisgesc.tb_aulas au
+            ON au.fk_turma = m.fk_turma AND au.fk_disciplina = m.fk_disciplina
         JOIN sisgesc.tb_professores pr
-            ON pr.pk_fk_cpf = t.fk_professor
+            ON pr.pk_fk_cpf = au.fk_cpf_professor
         JOIN dim_aluno da
             ON da.cpf_aluno = a.pk_fk_cpf
         JOIN dim_professor dp
@@ -779,7 +783,3 @@ SELECT * FROM v_inadimplencia_por_curso ORDER BY taxa_inadimplencia_pct DESC;
 -- ==============================================================================
 SELECT SUM(valor_liquido)             AS total_oltp FROM sisgesc.tb_mensalidades;
 SELECT SUM(valor_mensalidade_liquido) AS total_olap FROM dw_sisgesc.fato_receita;
-
--- ==============================================================================
--- FIM DO SCRIPT — SisGESC Data Warehouse & OLAP (v.3 — Corrigido)
--- ==============================================================================
