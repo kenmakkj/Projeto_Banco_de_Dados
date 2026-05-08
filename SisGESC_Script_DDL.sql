@@ -1,4 +1,3 @@
-
 -- =============================================================================
 -- SisGESC — Script DDL (MySQL)
 -- Sistema de Gestão Escolar — Universidade Privada
@@ -32,7 +31,8 @@ CREATE TABLE tb_pessoas (
   nacionalidade      VARCHAR(20)  NOT NULL DEFAULT 'brasileira',
   data_criacao       TIMESTAMP    NOT NULL DEFAULT NOW(),
   ultima_atualizacao TIMESTAMP    NOT NULL DEFAULT NOW(),
-  CONSTRAINT pk_pessoas PRIMARY KEY (pk_cpf)
+  CONSTRAINT pk_pessoas    PRIMARY KEY (pk_cpf),
+  CONSTRAINT ck_genero     CHECK       (genero IN ('M', 'F', 'O'))
 );
 
 CREATE TABLE tb_cep (
@@ -513,3 +513,61 @@ CREATE TABLE tb_pagamentos (
   CONSTRAINT pk_pagamentos          PRIMARY KEY (pk_pagamento),
   CONSTRAINT fk_pag_mensalidade     FOREIGN KEY (fk_mensalidade) REFERENCES tb_mensalidades(pk_mensalidade)
 );
+
+
+-- =============================================================================
+-- VIEWS — Campos Calculados (3FN)
+--
+-- Conforme apontado na avaliação:
+--   • tb_mensalidades.valor_multa e valor_juros são derivados do status/regras
+--     financeiras — expostos via VIEW para consulta sem recálculo na aplicação.
+--   • tb_folha_pagamento.salario_bruto, total_descontos e salario_liquido são
+--     snapshot do fechamento (RN13), mas a VIEW abaixo permite recalculá-los
+--     a partir de tb_folha_verbas para fins de auditoria e consulta.
+-- =============================================================================
+
+-- VIEW: mensalidades com encargos calculados (multa + juros sobre valor_liquido)
+-- Regra RN15: ao consultar uma mensalidade atrasada, valor_total já reflete encargos.
+CREATE OR REPLACE VIEW vw_mensalidades AS
+SELECT
+  m.pk_mensalidade,
+  m.fk_contrato,
+  m.fk_status,
+  sp.descricao                                             AS status_descricao,
+  m.data_vencimento,
+  m.valor_liquido,
+  m.valor_multa,
+  m.valor_juros,
+  (m.valor_liquido + m.valor_multa + m.valor_juros)       AS valor_total_com_encargos
+FROM tb_mensalidades m
+INNER JOIN tb_status_pagamento sp
+  ON sp.pk_status_pagamento = m.fk_status;
+
+-- VIEW: folha de pagamento recalculada a partir das verbas (auditoria — RN13)
+-- Permite verificar se o snapshot gravado na tb_folha_pagamento bate com o
+-- somatório real das verbas detalhadas em tb_folha_verbas.
+CREATE OR REPLACE VIEW vw_folha_pagamento AS
+SELECT
+  fp.pk_folha,
+  fp.fk_cpf_funcionario,
+  fp.mes,
+  fp.ano,
+  fp.status,
+  fp.data_pagamento,
+  -- Snapshot gravado no fechamento (imutável — RN13)
+  fp.salario_bruto      AS salario_bruto_snapshot,
+  fp.total_descontos    AS total_descontos_snapshot,
+  fp.salario_liquido    AS salario_liquido_snapshot,
+  -- Recálculo via verbas para auditoria
+  COALESCE(SUM(CASE WHEN v.tipo = 'P' THEN fv.valor ELSE 0 END), 0) AS salario_bruto_calculado,
+  COALESCE(SUM(CASE WHEN v.tipo = 'D' THEN fv.valor ELSE 0 END), 0) AS total_descontos_calculado,
+  COALESCE(SUM(CASE WHEN v.tipo = 'P' THEN fv.valor ELSE 0 END), 0)
+    - COALESCE(SUM(CASE WHEN v.tipo = 'D' THEN fv.valor ELSE 0 END), 0)
+                                                           AS salario_liquido_calculado
+FROM tb_folha_pagamento fp
+LEFT JOIN tb_folha_verbas fv ON fv.fk_folha = fp.pk_folha
+LEFT JOIN tb_verbas v        ON v.pk_verba  = fv.fk_verba
+GROUP BY
+  fp.pk_folha, fp.fk_cpf_funcionario, fp.mes, fp.ano,
+  fp.status, fp.data_pagamento,
+  fp.salario_bruto, fp.total_descontos, fp.salario_liquido;
