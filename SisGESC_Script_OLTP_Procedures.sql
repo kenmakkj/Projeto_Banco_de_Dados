@@ -1,10 +1,10 @@
-========================================================================
+-- ========================================================================
 --  SisGESC — Stored Procedures OLTP (MySQL)
 --  Sistema de Gestão Escolar — Universidade Privada
-========================================================================
+-- ========================================================================
 --  DESCRIÇÃO
 --  
---  16 stored procedures que cobrem os principais casos de uso do   sistema:
+--  16 stored procedures que cobrem os principais casos de uso do sistema:
 --    • Cadastro de pessoas, alunos e funcionários
 --    • Matrícula inicial e em disciplinas
 --    • Trancamento, notas, faltas e fechamento de período
@@ -277,7 +277,7 @@ END $$
 -- ─────────────────────────────────
 
 DROP PROCEDURE IF EXISTS sp_T06_registrar_falta $$
-
+ 
 CREATE PROCEDURE sp_T06_registrar_falta(
     IN p_matricula INT,
     IN p_disciplina INT,
@@ -285,17 +285,17 @@ CREATE PROCEDURE sp_T06_registrar_falta(
 )
 BEGIN
     DECLARE v_matricula_existe  INT DEFAULT 0;
-    DECLARE v_disciplina_existe INT DEFAULT 0;  -- CORREÇÃO: valida disciplina
-    DECLARE v_vinculo_existe    INT DEFAULT 0;  -- CORREÇÃO: valida vínculo matrícula/disciplina
-
+    DECLARE v_disciplina_existe INT DEFAULT 0;  
+    DECLARE v_vinculo_existe    INT DEFAULT 0; -- vínculo matrícula/disciplina
+ 
     DECLARE EXIT HANDLER FOR SQLEXCEPTION
     BEGIN
         ROLLBACK;
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Erro ao registrar faltas';
     END;
-
+ 
     START TRANSACTION;
-
+ 
     SELECT COUNT(*) INTO v_matricula_existe
     FROM tb_matriculas
     WHERE pk_codigo_matricula = p_matricula;
@@ -303,7 +303,7 @@ BEGIN
     IF v_matricula_existe = 0 THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Matrícula não encontrada';
     END IF;
-
+ 
     SELECT COUNT(*) INTO v_disciplina_existe
     FROM tb_disciplinas
     WHERE pk_codigo_disciplina = p_disciplina;
@@ -311,7 +311,7 @@ BEGIN
     IF v_disciplina_existe = 0 THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Disciplina não encontrada';
     END IF;
-
+ 
      SELECT COUNT(*) INTO v_vinculo_existe
     FROM tb_matricula_disciplinas
     WHERE fk_matricula = p_matricula
@@ -321,7 +321,7 @@ BEGIN
         SIGNAL SQLSTATE '45000'
             SET MESSAGE_TEXT = 'Aluno não está matriculado nesta disciplina';
     END IF;
-
+ 
     INSERT INTO tb_faltas(fk_matricula, fk_disciplina, quantidade_faltas)
     VALUES(p_matricula, p_disciplina, p_qtd_faltas);
  
@@ -331,8 +331,9 @@ END $$
 -- ──────────────────────────────────────
 -- T07 — FECHAMENTO DE PERÍODO (APROVAÇÃO / REPROVAÇÃO)
 -- ──────────────────────────────────────
-DROP PROCEDURE IF EXISTS sp_T07_fechamento_periodo $$
 
+DROP PROCEDURE IF EXISTS sp_T07_fechamento_periodo $$
+ 
 CREATE PROCEDURE sp_T07_fechamento_periodo(
     IN p_semestre VARCHAR(10),
     IN p_nota_minima DECIMAL(5,2),   
@@ -344,9 +345,9 @@ BEGIN
         ROLLBACK;
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Erro ao fechar período';
     END;
-
+ 
     START TRANSACTION;
-
+ 
     -- Valida se existem matrículas ativas no semestre informado
     IF NOT EXISTS (
         SELECT 1 FROM tb_matriculas
@@ -381,7 +382,7 @@ BEGIN
             )
       );
  
-)
+    -- REPROVAÇÃO: restante das matrículas ativas do semestre
     UPDATE tb_matriculas m
     SET status_matricula = 'CONCLUIDA',
         resultado_final  = 'REPROVADO'
@@ -778,3 +779,184 @@ BEGIN
 END $$
  
 DELIMITER ;
+
+-- ========================================================================
+-- SEÇÃO COMPLEMENTAR — VALIDAÇÃO DE PERFORMANCE E EXPLAIN
+-- ========================================================================
+-- Critério rubrica: EXPLAIN obrigatório com comparação antes/depois de índice
+-- e SELECTs standalone com subselect correlacionado.
+-- ========================================================================
+ 
+-- ───────────────────────────────────────────────────────────────
+-- A) SELECTS STANDALONE COM SUBSELECT CORRELACIONADO
+-- ───────────────────────────────────────────────────────────────
+ 
+-- A1) Alunos que possuem NOTA em TODAS as disciplinas matriculadas
+--     (subselect correlacionado com NOT EXISTS)
+SELECT
+    p.pk_cpf,
+    p.primeiro_nome,
+    p.sobrenome,
+    m.pk_codigo_matricula
+FROM tb_pessoas p
+JOIN tb_matriculas m ON m.fk_cpf = p.pk_cpf
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM tb_matricula_disciplinas md
+    LEFT JOIN tb_notas n
+        ON n.fk_matricula  = md.fk_matricula
+       AND n.fk_disciplina = md.fk_disciplina
+    WHERE md.fk_matricula = m.pk_codigo_matricula
+      AND n.nota IS NULL
+);
+ 
+-- A2) Funcionários cujo salário está acima da média do seu próprio cargo
+--     (subselect correlacionado referenciando a tabela externa)
+SELECT
+    f.pk_funcionario,
+    p.primeiro_nome,
+    p.sobrenome,
+    c.nome_cargo,
+    c.salario
+FROM tb_funcionarios f
+JOIN tb_pessoas  p ON p.pk_cpf   = f.fk_cpf
+JOIN tb_cargos   c ON c.pk_cargo = f.fk_cargo
+WHERE c.salario > (
+    SELECT AVG(c2.salario)
+    FROM tb_funcionarios f2
+    JOIN tb_cargos c2 ON c2.pk_cargo = f2.fk_cargo
+    WHERE c2.pk_cargo = c.pk_cargo   -- correlação com a linha externa
+);
+ 
+-- A3) Mensalidades pendentes de alunos que já possuem ao menos um pagamento PAGO
+--     (subselect correlacionado com EXISTS)
+SELECT
+    mn.pk_mensalidade,
+    p.primeiro_nome,
+    p.sobrenome,
+    mn.valor,
+    mn.data_vencimento
+FROM tb_mensalidades mn
+JOIN tb_contratos   ct ON ct.pk_contrato = mn.fk_contrato
+JOIN tb_matriculas  m  ON m.pk_codigo_matricula = ct.fk_matricula
+JOIN tb_pessoas     p  ON p.pk_cpf = m.fk_cpf
+WHERE mn.status_pagamento = 'PENDENTE'
+  AND EXISTS (
+      SELECT 1
+      FROM tb_mensalidades mn2
+      WHERE mn2.fk_contrato      = mn.fk_contrato   -- correlação
+        AND mn2.status_pagamento = 'PAGO'
+  );
+-- ───────────────────────────────────────────────────────────────
+-- B) EXPLAIN — SEM ÍNDICE  (baseline)
+-- ───────────────────────────────────────────────────────────────
+-- Consulta: boletim completo de um aluno filtrando por CPF.
+-- Sem índice em tb_matriculas.fk_cpf, o MySQL faz FULL TABLE SCAN.
+ 
+EXPLAIN SELECT
+    p.pk_cpf,
+    p.primeiro_nome,
+    p.sobrenome,
+    c.nome          AS curso,
+    d.nome          AS disciplina,
+    n.nota,
+    f.quantidade_faltas
+FROM tb_pessoas p
+JOIN tb_matriculas m
+    ON m.fk_cpf = p.pk_cpf
+JOIN tb_cursos c
+    ON c.pk_codigo_curso = m.fk_codigo_curso
+LEFT JOIN tb_matricula_disciplinas md
+    ON md.fk_matricula = m.pk_codigo_matricula
+LEFT JOIN tb_disciplinas d
+    ON d.pk_codigo_disciplina = md.fk_disciplina
+LEFT JOIN tb_notas n
+    ON n.fk_matricula  = m.pk_codigo_matricula
+   AND n.fk_disciplina = d.pk_codigo_disciplina
+LEFT JOIN tb_faltas f
+    ON f.fk_matricula  = m.pk_codigo_matricula
+   AND f.fk_disciplina = d.pk_codigo_disciplina
+WHERE p.pk_cpf = '12345678901';
+-- RESULTADO ESPERADO SEM ÍNDICE:
+-- tb_matriculas → type: ALL (full table scan), rows: ~N, Extra: Using where
+-- tb_notas / tb_faltas → type: ALL (sem índice em fk_matricula)
+ 
+-- ───────────────────────────────────────────────────────────────
+-- C) CRIAÇÃO DOS ÍNDICES DE OTIMIZAÇÃO
+-- ───────────────────────────────────────────────────────────────
+ 
+-- Índice em tb_matriculas para buscas por CPF do aluno
+CREATE INDEX IF NOT EXISTS idx_matriculas_fk_cpf
+    ON tb_matriculas (fk_cpf);
+ 
+-- Índice em tb_notas para joins por matrícula e disciplina
+CREATE INDEX IF NOT EXISTS idx_notas_matricula_disciplina
+    ON tb_notas (fk_matricula, fk_disciplina);
+ 
+-- Índice em tb_faltas para joins por matrícula e disciplina
+CREATE INDEX IF NOT EXISTS idx_faltas_matricula_disciplina
+    ON tb_faltas (fk_matricula, fk_disciplina);
+ 
+-- Índice em tb_matricula_disciplinas para joins
+CREATE INDEX IF NOT EXISTS idx_mat_disc_matricula
+    ON tb_matricula_disciplinas (fk_matricula);
+ 
+-- Índice em tb_mensalidades para consultas de inadimplência (T15)
+CREATE INDEX IF NOT EXISTS idx_mensalidades_status_vencimento
+    ON tb_mensalidades (status_pagamento, data_vencimento);
+ 
+-- ───────────────────────────────────────────────────────────────
+-- D) EXPLAIN — COM ÍNDICE  (após otimização)
+---------------------------------------------------------------------------------------
+-- Mesma consulta do boletim; agora os índices devem ser usados.
+ 
+EXPLAIN SELECT
+    p.pk_cpf,
+    p.primeiro_nome,
+    p.sobrenome,
+    c.nome          AS curso,
+    d.nome          AS disciplina,
+    n.nota,
+    f.quantidade_faltas
+FROM tb_pessoas p
+JOIN tb_matriculas m
+    ON m.fk_cpf = p.pk_cpf
+JOIN tb_cursos c
+    ON c.pk_codigo_curso = m.fk_codigo_curso
+LEFT JOIN tb_matricula_disciplinas md
+    ON md.fk_matricula = m.pk_codigo_matricula
+LEFT JOIN tb_disciplinas d
+    ON d.pk_codigo_disciplina = md.fk_disciplina
+LEFT JOIN tb_notas n
+    ON n.fk_matricula  = m.pk_codigo_matricula
+   AND n.fk_disciplina = d.pk_codigo_disciplina
+LEFT JOIN tb_faltas f
+    ON f.fk_matricula  = m.pk_codigo_matricula
+   AND f.fk_disciplina = d.pk_codigo_disciplina
+WHERE p.pk_cpf = '12345678901';
+-- RESULTADO ESPERADO COM ÍNDICE:
+-- tb_matriculas → type: ref, key: idx_matriculas_fk_cpf, rows: ~1-2
+-- tb_notas      → type: ref, key: idx_notas_matricula_disciplina
+-- tb_faltas     → type: ref, key: idx_faltas_matricula_disciplina
+-- Ganho: eliminação do full table scan; custo cai de O(N) para O(log N)
+ 
+-- ───────────────────────────────────────────────────────────────
+-- E) EXPLAIN — consulta de inadimplência (sp_T15) sem vs. com índice
+-- ───────────────────────────────────────────────────────────────
+ 
+-- E1) Sem índice (antes da criação acima — apenas para documentação):
+-- EXPLAIN UPDATE tb_mensalidades
+--     SET status_pagamento = 'INADIMPLENTE'
+--     WHERE data_vencimento < CURDATE()
+--       AND status_pagamento = 'PENDENTE';
+-- type: ALL, rows: ~N (full scan em toda a tabela)
+ 
+-- E2) Com índice idx_mensalidades_status_vencimento:
+EXPLAIN SELECT pk_mensalidade, fk_contrato, valor, data_vencimento
+FROM tb_mensalidades
+WHERE status_pagamento = 'PENDENTE'
+  AND data_vencimento  < CURDATE();
+-- RESULTADO ESPERADO COM ÍNDICE:
+-- type: range, key: idx_mensalidades_status_vencimento
+-- Apenas as linhas pendentes e vencidas são lidas — ganho expressivo
+-- em bases com milhares de mensalidades.
