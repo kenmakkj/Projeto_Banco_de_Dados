@@ -1,28 +1,352 @@
-# Introdução: Sistema de Gestão Escolar (SisGESC)
-O presente trabalho tem como objetivo apresentar o desenvolvimento do sistema SisGESC, concebido a partir da aplicação de conceitos fundamentais de modelagem de dados, organização de sistemas e boas práticas de desenvolvimento.
-Este projeto foi elaborado como parte das atividades acadêmicas propostas ao longo do curso, buscando integrar teoria e prática na construção de uma solução estruturada e eficiente.
-Todo o desenvolvimento contou com supervisão docente, cuja orientação foi essencial para a validação das decisões técnicas, garantindo a consistência, organização e qualidade do sistema apresentado.
-No cenário educacional atual, é necessário que as instituições de ensino superior possuam um sistema com precisão pedagógica e níveis elevados de eficiência na busca de dados. O SisGESC é uma solução desenvolvida para universidades privadas que ainda não dispõem desses recursos, projetado sobre os três pilares centrais de qualquer universidade: Módulo Acadêmico, Módulo Financeiro e Módulo de Recursos Humanos (RH).
+# SisGESC — Sistema de Gestão Escolar
 
-O sistema adota uma política de integridade referencial híbrida. Aplica-se o modelo Restrito (RESTRICT) em entidades nucleares dos módulos Financeiro e RH, garantindo a consistência de dados históricos exigida pelas camadas de BI e IA. Já o modelo em cascata (CASCADE) é utilizado em tabelas operacionais dependentes, otimizando a manutenção do banco e eliminando registros órfãos automaticamente. Essas políticas são declaradas explicitamente nas cláusulas ON DELETE das chaves estrangeiras no script SQL de criação.
+> Projeto acadêmico de modelagem e implementação de banco de dados relacional para universidade privada, desenvolvido com MySQL. Arquitetura em 3FN com módulos OLTP (Acadêmico, Financeiro, RH) e camada OLAP (Data Warehouse / Star Schema).
 
-Diferente de sistemas de gestão mais simples, o SisGESC foi arquitetado na Terceira Forma Normal (3FN), garantindo que não haja redundâncias nem dependências transitivas entre atributos, preservando a integridade referencial de matrículas, carga horária docente e controle financeiro. O sistema não apenas armazena informações — organiza-as estrategicamente para suportar camadas de Business Intelligence (BI) e Inteligência Artificial (IA).
-Através do uso de rastreabilidade temporal (vigências de contrato e histórico de status) e entidades associativas, o sistema permite tanto a consulta de registros históricos quanto a previsão de situações de risco, como evasão escolar e inadimplência. O documento a seguir apresenta o diagrama DER, o dicionário de dados e as regras de negócio que sustentam essa inteligência educacional.
+---
 
-# BI — Business Intelligence
-O SisGESC utiliza as estruturas de rastreabilidade temporal (vigências via data_inicio e data_fim) e os diversos campos de status distribuídos pelo schema para transformar dados brutos em indicadores e percentuais apresentados à gestão da instituição.
-Dashboards financeiros
-Dashboards automáticos cruzam dados de tb_pagamentos com tb_mensalidades e tb_contratos_educacionais por curso e período letivo, permitindo visualizar a receita real por turma e identificar gaps entre o valor contratado e o efetivamente recebido. Os campos valor_multa e valor_juros em tb_mensalidades permitem mensurar o impacto financeiro da inadimplência de forma granular.
+## Sumário
 
-Monitoramento de inadimplência
-O sistema monitora a inadimplência através do campo fk_status em tb_mensalidades (Pendente, Pago, Atrasado, Cancelado), cruzado com tb_contratos_educacionais.is_ativo. Isso permite identificar o nível de criticidade de cada aluno e acionar intervenções preventivas antes que a situação comprometa a renovação de matrícula — conforme definido nas regras de negócio RN02 e RN15.
-Relatórios acadêmicos
-Relatórios de médias e faltas são gerados em tempo real a partir de tb_notas, tb_avaliacoes e tb_faltas, permitindo identificar padrões de aprovação e reprovação por disciplina, turma e período letivo. O campo media_final em tb_resultado_matricula consolida esses dados para consultas rápidas sem necessidade de recálculo.
+1. [Visão Geral](#visão-geral)
+2. [Pré-requisitos](#pré-requisitos)
+3. [Estrutura do Repositório](#estrutura-do-repositório)
+4. [Como Executar — Passo a Passo](#como-executar--passo-a-passo)
+5. [Prova de Idempotência (Fase 2)](#prova-de-idempotência-fase-2)
+6. [Performance e Índices (Fase 5)](#performance-e-índices-fase-5)
+7. [Data Warehouse e ETL (Fase 4)](#data-warehouse-e-etl-fase-4)
+8. [Modelagem OLAP — Star Schema (DER)](#modelagem-olap--star-schema-der)
+9. [Regras de Negócio Implementadas](#regras-de-negócio-implementadas)
+10. [Módulos do Sistema](#módulos-do-sistema)
 
-# IA — Inteligência Artificial
-A camada de IA utiliza os dados históricos e a integridade referencial do schema para realizar análises preventivas em duas frentes principais:
-Previão de evasão escolar.
+---
 
-Algoritmos analisam padrões em tb_faltas (frequência e quantidade de faltas ao longo do tempo) cruzados com atrasos em tb_mensalidades (fk_status = 'Atrasado'). Caso um aluno apresente comportamento de risco simultâneo nos dois indicadores — alta frequência de faltas e inadimplência recorrente — o sistema alerta a instituição para uma intervenção preventiva, auxiliando o aluno antes que a situação evolua para desistência ou jubilamento.
-Otimização de alocação docente
-A IA analisa a distribuição de aulas em tb_aulas (campos horario_inicio, horario_fim e dia_semana por fk_cpf_professor) para identificar padrões de sobrecarga que podem impactar a qualidade do ensino ou levar ao desligamento de professores. Com base nesses padrões, o sistema sugere ajustes estratégicos na alocação de disciplinas, equilibrando a carga entre os docentes disponíveis e reduzindo o risco de turnover.
+## Visão Geral
+
+O **SisGESC** é um sistema de gestão escolar projetado para universidades privadas, estruturado sobre três pilares:
+
+| Módulo       | Responsabilidade                                              |
+|--------------|---------------------------------------------------------------|
+| **Acadêmico** | Cursos, alunos, matrículas, notas, faltas, grade curricular  |
+| **Financeiro** | Contratos, mensalidades, bolsas, pagamentos, inadimplência  |
+| **RH**        | Funcionários, professores, folha de pagamento, férias       |
+
+O banco OLTP (`sisgesc`) é espelhado para um Data Warehouse (`dw_sisgesc`) via processo ETL, habilitando análises OLAP por meio de Star Schema.
+
+---
+
+## Pré-requisitos
+
+- **MySQL** versão 8.0 ou superior (necessário para `CREATE INDEX IF NOT EXISTS` e window functions)
+- **MySQL Workbench**, **DBeaver** ou cliente de linha de comando `mysql`
+- Usuário com permissões de `CREATE DATABASE`, `CREATE TABLE`, `CREATE VIEW`, `CREATE PROCEDURE` e `CREATE INDEX`
+
+---
+
+## Estrutura do Repositório
+
+```
+SisGESC/
+│
+├── run_all.sql                              ← ⭐ SCRIPT ÚNICO DE INSTALAÇÃO
+│
+├── SisGESC_Script_DDL_otimizado.sql         ← Fase 1: Estrutura OLTP (tabelas + views)
+├── SisGESC_Script_DML_corrigido.sql         ← Fase 2: Carga de dados + prova de idempotência
+├── SisGESC_Script_OLTP_Procedures.sql       ← Fase 3: Stored Procedures + EXPLAIN
+├── SisGESC_Data_Warehouse_OLAP_corrigido.sql← Fase 4: Data Warehouse + ETL
+├── SisGESC_Script_Governanca_corrigido.sql  ← Fase 5/6: EXPLAIN antes/depois + índices + reset
+│
+├── Diagrama_Final.pdf                       ← DER (modelo OLTP)
+├── DER_StarSchema_OLAP.md                   ← Modelagem Star Schema (código Mermaid/PlantUML)
+├── Dicionario_Sisgesc.pdf                   ← Dicionário de dados completo
+├── SisGESC_Regras_Negocio.pdf               ← Regras de negócio (RN01–RN16)
+│
+└── README.md                                ← Este arquivo
+```
+
+---
+
+## Como Executar — Passo a Passo
+
+### Opção 1 — Script Único (Recomendada)
+
+Execute o `run_all.sql` pela linha de comando. Ele automaticamente chama todos os scripts na ordem correta (reset → DDL → DML → procedures → OLAP).
+
+```bash
+mysql -u root -p < run_all.sql
+```
+
+> **Atenção:** O `run_all.sql` usa `SOURCE` para encadear os scripts. Todos os arquivos `.sql` devem estar no mesmo diretório. Se estiver usando MySQL Workbench ou DBeaver, abra o `run_all.sql` e execute como script (não como query individual).
+
+---
+
+### Opção 2 — Execução Manual (Script por Script)
+
+Se preferir executar cada fase separadamente, siga rigorosamente a ordem abaixo:
+
+#### Fase 1 — DDL (Estrutura do banco OLTP)
+
+```sql
+SOURCE SisGESC_Script_DDL_otimizado.sql;
+```
+
+Cria o banco `sisgesc` com todas as tabelas, constraints (PK, FK, CHECK, UNIQUE), views `vw_mensalidades` e `vw_folha_pagamento`.
+
+#### Fase 2 — DML (Carga de dados + Idempotência)
+
+```sql
+SOURCE SisGESC_Script_DML_corrigido.sql;
+```
+
+**Importante:** O script executa automaticamente o `SELECT COUNT(*)` em todas as tabelas **antes** e **depois** da carga. Os totais devem ser **idênticos** na segunda execução — isso prova a idempotência.
+
+#### Fase 3 — OLTP Procedures
+
+```sql
+SOURCE SisGESC_Script_OLTP_Procedures.sql;
+```
+
+Cria as 16 stored procedures transacionais.
+
+#### Fase 4 — OLAP / Data Warehouse
+
+```sql
+SOURCE SisGESC_Data_Warehouse_OLAP_corrigido.sql;
+```
+
+Cria o banco `dw_sisgesc` com dimensões, tabelas fato, views analíticas e procedures ETL. Ao final, execute o master ETL:
+
+```sql
+USE dw_sisgesc;
+CALL sp_etl_carga_completa_dw();
+```
+
+#### Fase 5/6 — Governança e Performance
+
+```sql
+SOURCE SisGESC_Script_Governanca_corrigido.sql;
+```
+
+Executa o `EXPLAIN` **antes** dos índices (baseline), cria os índices e executa o `EXPLAIN` **depois** para demonstrar o ganho de performance.
+
+---
+
+## Prova de Idempotência (Fase 2)
+
+O script `SisGESC_Script_DML_corrigido.sql` está dividido em **3 passos**:
+
+| Passo | Ação |
+|-------|------|
+| **Passo 1** | `SELECT COUNT(*)` em todas as 43 tabelas → registra os totais **antes** da carga |
+| **Passo 2** | Executa todos os `INSERT IGNORE` (carga de dados) |
+| **Passo 3** | `SELECT COUNT(*)` em todas as 43 tabelas → totais **após** a carga |
+
+**Como validar:** Execute o script inteiro **duas vezes**. Os valores do Passo 1 e do Passo 3 devem ser **exatamente iguais** na segunda execução. Se qualquer total aumentar, a idempotência foi violada.
+
+O `INSERT IGNORE` é o mecanismo que garante isso: ao encontrar uma chave primária ou unique já existente, o MySQL simplesmente descarta o INSERT sem erro.
+
+---
+
+## Performance e Índices (Fase 5)
+
+O script `SisGESC_Script_Governanca_corrigido.sql` demonstra o impacto dos índices em 3 fases:
+
+### Fase A — EXPLAIN sem índices (baseline)
+
+```
+tb_matriculas  → type: ALL,   rows: ~12  (full table scan)
+tb_notas       → type: ALL,   rows: ~7   (full table scan)
+tb_faltas      → type: ALL,   rows: ~7   (full table scan)
+```
+
+### Fase B — Criação dos índices
+
+Exemplo dos índices mais relevantes criados:
+
+```sql
+CREATE INDEX idx_mat_aluno_periodo ON tb_matriculas (fk_cpf_aluno, fk_periodo);
+CREATE INDEX idx_nota_matricula    ON tb_notas      (fk_matricula, fk_avaliacao);
+CREATE INDEX idx_falta_matricula   ON tb_faltas     (fk_matricula);
+CREATE INDEX idx_mens_status_venc  ON tb_mensalidades (fk_status, data_vencimento);
+```
+
+### Fase C — EXPLAIN com índices (pós-otimização)
+
+```
+tb_matriculas  → type: ref,   key: idx_mat_aluno_periodo,  rows: ~2
+tb_notas       → type: ref,   key: idx_nota_matricula,     rows: ~1
+tb_faltas      → type: ref,   key: idx_falta_matricula,    rows: ~2
+```
+
+**Ganho:** redução de ~83% nas linhas lidas. Custo passa de O(N) para O(log N).
+
+---
+
+## Data Warehouse e ETL (Fase 4)
+
+O banco `dw_sisgesc` implementa Star Schema com:
+
+| Dimensão | Tabela | Descrição |
+|----------|--------|-----------|
+| Tempo | `dim_tempo` | Calendário completo 2015–2030 |
+| Aluno | `dim_aluno` | Dados desnormalizados do aluno |
+| Curso | `dim_curso` | Dados do curso com nível acadêmico |
+| Professor | `dim_professor` | Dados docentes |
+| Disciplina | `dim_disciplina` | Catálogo de disciplinas |
+
+| Fato | Tabela | Granularidade |
+|------|--------|---------------|
+| Receita | `fato_receita` | 1 linha = 1 mensalidade/aluno/mês |
+| Desempenho | `fato_desempenho` | 1 linha = 1 resultado de disciplina/aluno/período |
+| Folha | `fato_folha_pagamento` | 1 linha = 1 folha/funcionário/mês |
+
+### Validação OLTP = OLAP
+
+Após rodar o ETL, execute:
+
+```sql
+SELECT SUM(valor_liquido)             AS total_oltp FROM sisgesc.tb_mensalidades;
+SELECT SUM(valor_mensalidade_liquido) AS total_olap FROM dw_sisgesc.fato_receita;
+```
+
+Os dois valores **devem ser iguais**. Diferença indica erro no ETL.
+
+---
+
+## Modelagem OLAP — Star Schema (DER)
+
+O diagrama abaixo descreve em **Mermaid** as adições necessárias ao DER para representar o modelo Star Schema do `dw_sisgesc`.
+
+```mermaid
+erDiagram
+    dim_tempo {
+        int sk_tempo PK
+        date data_completa
+        int ano
+        int mes
+        int trimestre
+        int semestre
+        varchar nome_mes
+        boolean eh_fim_semana
+    }
+
+    dim_aluno {
+        int sk_aluno PK
+        varchar cpf_aluno
+        varchar nome_completo
+        varchar curso_atual
+        varchar status_aluno
+        boolean eh_ativo
+    }
+
+    dim_curso {
+        int sk_curso PK
+        int codigo_curso
+        varchar nome_curso
+        varchar nivel_academico
+        boolean eh_ativo
+    }
+
+    dim_professor {
+        int sk_professor PK
+        varchar cpf_professor
+        varchar nome_completo
+        varchar titulacao
+        varchar departamento
+    }
+
+    dim_disciplina {
+        int sk_disciplina PK
+        varchar codigo_disciplina
+        varchar nome_disciplina
+        int carga_horaria_total
+    }
+
+    fato_receita {
+        int sk_aluno FK
+        int sk_curso FK
+        int sk_tempo_vencimento FK
+        int sk_tempo_pagamento FK
+        int numero_mensalidade
+        decimal valor_mensalidade_liquido
+        decimal valor_pago
+        decimal valor_em_aberto
+        boolean eh_em_atraso
+    }
+
+    fato_desempenho {
+        int sk_aluno FK
+        int sk_professor FK
+        int sk_disciplina FK
+        int sk_curso FK
+        int sk_tempo_conclusao FK
+        decimal nota_obtida
+        int faltas
+        boolean eh_aprovado
+    }
+
+    fato_folha_pagamento {
+        int sk_professor FK
+        int sk_tempo FK
+        decimal salario_bruto
+        decimal total_deducoes
+        decimal salario_liquido
+    }
+
+    dim_aluno      ||--o{ fato_receita      : "sk_aluno"
+    dim_curso      ||--o{ fato_receita      : "sk_curso"
+    dim_tempo      ||--o{ fato_receita      : "sk_tempo_vencimento"
+    dim_aluno      ||--o{ fato_desempenho   : "sk_aluno"
+    dim_professor  ||--o{ fato_desempenho   : "sk_professor"
+    dim_disciplina ||--o{ fato_desempenho   : "sk_disciplina"
+    dim_curso      ||--o{ fato_desempenho   : "sk_curso"
+    dim_tempo      ||--o{ fato_desempenho   : "sk_tempo_conclusao"
+    dim_professor  ||--o{ fato_folha_pagamento : "sk_professor"
+    dim_tempo      ||--o{ fato_folha_pagamento : "sk_tempo"
+```
+
+**O que muda no DER existente:**
+- As tabelas `dim_*` e `fato_*` são criadas em um banco separado (`dw_sisgesc`) e **não alteram** o schema OLTP (`sisgesc`).
+- O DER OLTP permanece intacto. O Star Schema é um novo diagrama independente.
+- A ligação entre os dois mundos é feita pelas stored procedures ETL (`sp_etl_*`), que leem do `sisgesc` e escrevem no `dw_sisgesc`.
+
+---
+
+## Regras de Negócio Implementadas
+
+| ID | Mecanismo | Localização |
+|----|-----------|-------------|
+| RN01 | CHECK carga_horaria >= 40 | DDL tb_disciplinas |
+| RN02 | Validação na stored procedure de matrícula | OLTP Procedures |
+| RN03 | CHECK (carga_horaria >= 40) | DDL tb_disciplinas |
+| RN04 | Validação + FOREIGN KEY is_ativo | OLTP Procedures |
+| RN05 | FOREIGN KEY fk_periodo | DDL tb_matriculas / tb_aulas |
+| RN06 | Trigger/Procedure + INSERT em tb_log_notas | OLTP Procedures |
+| RN07 | Calculated field via Procedure | sp_fechamento_periodo |
+| RN08 | UPDATE situacao via Procedure | sp_fechamento_periodo |
+| RN09 | UNIQUE (fk_sala, dia, horario, periodo) | DDL tb_aulas |
+| RN10 | Validação em procedure de matrícula | OLTP Procedures |
+| RN11 | UPDATE is_ativo via Procedure | sp_atualizar_status_aluno |
+| RN12 | PRIMARY KEY composta (fk_folha, fk_verba) | DDL tb_folha_verbas |
+| RN13 | Snapshot imutável + VIEW vw_folha_pagamento | DDL + VIEW |
+| RN14 | CHECK (percentual IS NOT NULL OR valor IS NOT NULL) | DDL tb_descontos_bolsas |
+| RN15 | DEFAULT 0 + VIEW vw_mensalidades | DDL + VIEW |
+| RN16 | CHECK (genero IN ('M', 'F', 'O')) | DDL tb_pessoas |
+
+---
+
+## Módulos do Sistema
+
+### Módulo Acadêmico
+Gerencia o ciclo de vida acadêmico: desde o cadastro de cursos e disciplinas até o fechamento de período com cálculo de médias e verificação de frequência.
+
+### Módulo Financeiro
+Controla contratos educacionais, bolsas (ProUni, FIES, Desempenho, Funcionário), mensalidades e pagamentos. Monitora inadimplência via `vw_mensalidades`.
+
+### Módulo RH
+Gerencia funcionários e professores (herança 1:1 via CPF), folha de pagamento com snapshot imutável (RN13), verbas, benefícios, férias e afastamentos.
+
+### Data Warehouse (OLAP)
+Camada analítica com Star Schema, views de inadimplência por curso, desempenho acadêmico e custo operacional por departamento. Processo ETL noturno via stored procedures.
+
+---
+
+*Projeto desenvolvido como entrega final da disciplina de Banco de Dados — SisGESC v6.0*
