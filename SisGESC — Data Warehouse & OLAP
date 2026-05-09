@@ -4,11 +4,6 @@
 -- (Conteúdo idêntico ao SisGESC___Data_Warehouse___OLAP.txt, com nome
 --  padronizado para ser chamado pelo run_all.sql via SOURCE)
 -- =============================================================================
--- Todos os BUGs originais já estavam corrigidos neste arquivo (v.3).
--- Nenhuma alteração de lógica foi necessária.
--- Alteração aplicada nesta versão: renomeação do arquivo para snake_case
--- e adição do cabeçalho de referência ao run_all.sql.
--- =============================================================================
 
 CREATE DATABASE IF NOT EXISTS dw_sisgesc 
 CHARACTER SET utf8mb4 
