@@ -907,7 +907,7 @@ CREATE INDEX IF NOT EXISTS idx_mensalidades_status_vencimento
  
 -- ───────────────────────────────────────────────────────────────
 -- D) EXPLAIN — COM ÍNDICE  (após otimização)
----------------------------------------------------------------------------------------
+-- ---------------------------------------------------------------------------------------
 -- Mesma consulta do boletim; agora os índices devem ser usados.
  
 EXPLAIN SELECT
