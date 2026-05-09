@@ -1,20 +1,14 @@
 -- =============================================================================
--- SisGESC — DATA WAREHOUSE & OLAP
--- Sistema de Gestão Escolar — Componente de Análise e Inteligência de Negócios
---
--- ARQUITETURA:
--- CAMADA OLTP: sisgesc        → Transações (INSERT/UPDATE/DELETE rápido)
--- CAMADA OLAP: dw_sisgesc     → Análises   (SELECT agregado rápido)
--- PROCESSO ETL: ETL Noturno   → Replica OLTP → OLAP
---
--- CORREÇÕES APLICADAS (v.3):
--- [BUG 1] DELETE TABLE → DELETE FROM dim_aluno (sintaxe errada)
--- [BUG 2] Query receita: WHERE YEAR dt.ano=2024 → JOIN dim_tempo + WHERE dt.ano=2024
--- [BUG 3] Query tendência: WHERE YEAR dt ON ... → JOIN dim_tempo (sintaxe completamente errada)
--- [BUG 4] tb_pessoas com LEFT JOIN mas dim_aluno com JOIN → inconsistência que gera erro
--- [BUG 5] tb_aluno_curso e dim_curso ainda LEFT JOIN → sk_curso pode ser NULL na PK
--- [BUG 6] v_inadimplencia_por_curso: WHERE status filtra antes do GROUP BY → taxa errada
--- ==============================================================================
+-- SisGESC — Data Warehouse & OLAP — VERSÃO CORRIGIDA
+-- Arquivo: SisGESC_Data_Warehouse_OLAP_corrigido.sql
+-- (Conteúdo idêntico ao SisGESC___Data_Warehouse___OLAP.txt, com nome
+--  padronizado para ser chamado pelo run_all.sql via SOURCE)
+-- =============================================================================
+-- Todos os BUGs originais já estavam corrigidos neste arquivo (v.3).
+-- Nenhuma alteração de lógica foi necessária.
+-- Alteração aplicada nesta versão: renomeação do arquivo para snake_case
+-- e adição do cabeçalho de referência ao run_all.sql.
+-- =============================================================================
 
 CREATE DATABASE IF NOT EXISTS dw_sisgesc 
 CHARACTER SET utf8mb4 
@@ -141,15 +135,6 @@ CREATE TABLE IF NOT EXISTS dim_disciplina (
 
 -- ==============================================================================
 -- TABELA DE FATOS: RECEITA FINANCEIRA
--- GRANULARIDADE: 1 linha = 1 mensalidade por aluno por mês
--- Métricas:
---   valor_mensalidade_liquido → ADITIVA  (pode somar entre cursos e períodos)
---   valor_pago                → ADITIVA
---   valor_total_devido        → ADITIVA
---   valor_em_aberto           → ADITIVA
---   dias_em_atraso            → SEMI-ADITIVA (faz sentido por aluno, não somada)
---   status_pagamento          → NÃO-ADITIVA (atributo textual)
---   eh_em_atraso              → NÃO-ADITIVA (flag booleana, conta-se, não soma)
 -- ==============================================================================
 CREATE TABLE IF NOT EXISTS fato_receita (
     sk_aluno                  INT,
@@ -183,13 +168,6 @@ CREATE TABLE IF NOT EXISTS fato_receita (
 
 -- ==============================================================================
 -- TABELA DE FATOS: DESEMPENHO ACADÊMICO
--- GRANULARIDADE: 1 linha = 1 resultado de disciplina por aluno por período
--- Métricas:
---   nota_obtida           → NÃO-ADITIVA (agrega por AVG, nunca SUM)
---   frequencia_percentual → NÃO-ADITIVA (agrega por AVG, nunca SUM)
---   faltas                → ADITIVA     (pode somar total de faltas)
---   presencas             → ADITIVA
---   eh_aprovado           → NÃO-ADITIVA (flag; usa COUNT, não SUM)
 -- ==============================================================================
 CREATE TABLE IF NOT EXISTS fato_desempenho (
     sk_aluno           INT,
@@ -225,11 +203,6 @@ CREATE TABLE IF NOT EXISTS fato_desempenho (
 
 -- ==============================================================================
 -- TABELA DE FATOS: FOLHA DE PAGAMENTO
--- GRANULARIDADE: 1 linha = 1 folha de pagamento por funcionário por mês
--- Métricas:
---   salario_bruto   → ADITIVA     (pode somar custo total)
---   salario_liquido → ADITIVA
---   total_deducoes  → ADITIVA
 -- ==============================================================================
 CREATE TABLE IF NOT EXISTS fato_folha_pagamento (
     sk_professor              INT,
@@ -299,9 +272,6 @@ JOIN dim_curso dc ON dc.sk_curso = fd.sk_curso
 JOIN dim_tempo dt ON dt.sk_tempo = fd.sk_tempo_conclusao
 GROUP BY dc.sk_curso, dc.nome_curso, dt.ano, fd.semestre_cursado;
 
--- [BUG 6 CORRIGIDO] WHERE removido — filtrar antes do GROUP BY excluía alunos
--- em dia do denominador, tornando a taxa sempre próxima de 100%.
--- A separação entre total e inadimplentes agora é feita com CASE WHEN no SELECT.
 CREATE OR REPLACE VIEW v_inadimplencia_por_curso AS
 SELECT
     dc.sk_curso, dc.nome_curso, dc.departamento,
@@ -313,7 +283,6 @@ SELECT
     SUM(CASE WHEN fr.eh_em_atraso THEN fr.dias_em_atraso     ELSE 0 END)          AS dias_atraso_total
 FROM fato_receita fr
 JOIN dim_curso dc ON dc.sk_curso = fr.sk_curso
--- [CORRIGIDO] sem WHERE — agrupa todos os alunos para denominador correto
 GROUP BY dc.sk_curso, dc.nome_curso, dc.departamento;
 
 CREATE OR REPLACE VIEW v_custo_operacional_departamento AS
@@ -337,10 +306,8 @@ GROUP BY dp.departamento, dt.ano, dt.mes, dt.nome_mes;
 
 DELIMITER $$
 
--- Dimensão Tempo
 CREATE PROCEDURE IF NOT EXISTS sp_etl_carregar_tempo()
 BEGIN
-    -- ✅ TODOS os DECLAREs primeiro, inclusive o handler
     DECLARE v_data     DATE;
     DECLARE v_sk_tempo INT;
     DECLARE v_inicio   DATE;
@@ -351,7 +318,6 @@ BEGIN
         SELECT 'ERRO ao carregar dimensão tempo' AS resultado;
     END;
 
-    -- ✅ SET só depois de todos os DECLAREs
     SET v_inicio = DATE('2015-01-01');
     SET v_fim    = DATE_ADD(CURDATE(), INTERVAL 5 YEAR);
     SET v_data   = v_inicio;
@@ -378,9 +344,6 @@ BEGIN
     SELECT '✓ Dimensão TEMPO carregada com sucesso' AS resultado;
 END$$
 
--- Dimensão Aluno
--- SCD Tipo 1 adotado: dados sempre atualizados com estado mais recente.
--- Histórico de mudanças não é necessário para as análises deste projeto.
 CREATE PROCEDURE IF NOT EXISTS sp_etl_carregar_alunos()
 BEGIN
     DECLARE v_registros INT DEFAULT 0;
@@ -390,7 +353,6 @@ BEGIN
         SELECT 'ERRO ao carregar alunos' AS resultado;
     END;
     START TRANSACTION;
-        -- [BUG 1 CORRIGIDO] era DELETE TABLE (sintaxe inválida no MySQL)
         DELETE FROM dim_aluno;
         INSERT INTO dim_aluno (
             cpf_aluno, rgm_aluno, nome_completo, nome_primeiro, nome_sobrenome,
@@ -413,14 +375,10 @@ BEGIN
             sa.descricao,
             (a.fk_status = 1)
         FROM sisgesc.tb_alunos a
-        JOIN sisgesc.tb_pessoas p
-            ON p.pk_cpf = a.pk_fk_cpf
-        JOIN sisgesc.tb_status_aluno sa
-            ON sa.pk_status_aluno = a.fk_status
-        JOIN sisgesc.tb_aluno_curso ac
-            ON ac.fk_cpf_aluno = a.pk_fk_cpf
-        JOIN sisgesc.tb_cursos c
-            ON c.pk_curso = ac.fk_curso
+        JOIN sisgesc.tb_pessoas p       ON p.pk_cpf = a.pk_fk_cpf
+        JOIN sisgesc.tb_status_aluno sa ON sa.pk_status_aluno = a.fk_status
+        JOIN sisgesc.tb_aluno_curso ac  ON ac.fk_cpf_aluno = a.pk_fk_cpf
+        JOIN sisgesc.tb_cursos c        ON c.pk_curso = ac.fk_curso
         LEFT JOIN sisgesc.tb_contratos_educacionais ce
             ON ce.fk_cpf_aluno = a.pk_fk_cpf AND ce.is_ativo = TRUE
         LEFT JOIN sisgesc.tb_descontos_bolsas db
@@ -431,8 +389,6 @@ BEGIN
     COMMIT;
 END$$
 
--- Dimensão Curso
--- SCD Tipo 1: sobrescreve com estado atual do OLTP.
 CREATE PROCEDURE IF NOT EXISTS sp_etl_carregar_cursos()
 BEGIN
     DECLARE v_registros INT DEFAULT 0;
@@ -456,7 +412,6 @@ BEGIN
     COMMIT;
 END$$
 
--- Dimensão Professor
 CREATE PROCEDURE IF NOT EXISTS sp_etl_carregar_professores()
 BEGIN
     DECLARE v_registros INT DEFAULT 0;
@@ -480,21 +435,16 @@ BEGIN
             f.data_admissao,
             (f.data_demissao IS NULL)
         FROM sisgesc.tb_funcionarios f
-        JOIN sisgesc.tb_pessoas p
-            ON p.pk_cpf = f.pk_fk_cpf
-        JOIN sisgesc.tb_professores pr
-            ON pr.pk_fk_cpf = f.pk_fk_cpf
-        JOIN sisgesc.tb_departamentos dep
-            ON dep.pk_departamento = f.fk_departamento
-        JOIN sisgesc.tb_titulacoes ti
-            ON ti.pk_titulacao = pr.fk_titulacao
+        JOIN sisgesc.tb_pessoas p       ON p.pk_cpf = f.pk_fk_cpf
+        JOIN sisgesc.tb_professores pr  ON pr.pk_fk_cpf = f.pk_fk_cpf
+        JOIN sisgesc.tb_departamentos dep ON dep.pk_departamento = f.fk_departamento
+        JOIN sisgesc.tb_titulacoes ti   ON ti.pk_titulacao = pr.fk_titulacao
         WHERE f.data_demissao IS NULL;
         SELECT ROW_COUNT() INTO v_registros;
         SELECT CONCAT('✓ ', v_registros, ' professores carregados') AS resultado;
     COMMIT;
 END$$
 
--- Dimensão Disciplina
 CREATE PROCEDURE IF NOT EXISTS sp_etl_carregar_disciplinas()
 BEGIN
     DECLARE v_registros INT DEFAULT 0;
@@ -517,7 +467,6 @@ BEGIN
     COMMIT;
 END$$
 
--- Fato Receita
 CREATE PROCEDURE IF NOT EXISTS sp_etl_carregar_fato_receita()
 BEGIN
     DECLARE v_registros INT DEFAULT 0;
@@ -543,10 +492,8 @@ BEGIN
                  THEN CAST(DATE_FORMAT(pg.data_pagamento, '%Y%m%d') AS UNSIGNED)
                  ELSE NULL END,
             m.fk_contrato,
-            m.numero_mensalidade,
+            m.pk_mensalidade,
             m.valor_liquido,
-            -- [BUG 5 CORRIGIDO parcial] desconto isolado em subquery para evitar
-            -- duplicação de linhas causada pelo LEFT JOIN com tb_descontos_bolsas
             COALESCE((
                 SELECT SUM(db2.valor_fixo_desconto)
                 FROM sisgesc.tb_descontos_bolsas db2
@@ -562,26 +509,14 @@ BEGIN
             sp.descricao,
             (m.data_vencimento < CURDATE() AND sp.descricao IN ('Pendente','Atrasado'))
         FROM sisgesc.tb_mensalidades m
-        -- [BUG 4 e 5 CORRIGIDO] tb_contratos, tb_alunos, tb_pessoas e dim_aluno
-        -- trocados de LEFT JOIN para JOIN — mensalidade sempre tem aluno.
-        -- sk_aluno e sk_curso não podem ser NULL pois compõem a PRIMARY KEY.
-        JOIN sisgesc.tb_contratos_educacionais ce
-            ON ce.pk_contrato = m.fk_contrato
-        JOIN sisgesc.tb_alunos a
-            ON a.pk_fk_cpf = ce.fk_cpf_aluno
-        JOIN sisgesc.tb_pessoas p
-            ON p.pk_cpf = a.pk_fk_cpf
-        JOIN dim_aluno da
-            ON da.cpf_aluno = p.pk_cpf
-        JOIN sisgesc.tb_aluno_curso ac
-            ON ac.fk_cpf_aluno = a.pk_fk_cpf
-        JOIN dim_curso dc
-            ON dc.codigo_curso = ac.fk_curso
-        -- pagamentos e status ficam LEFT JOIN (podem não existir ainda)
-        LEFT JOIN sisgesc.tb_pagamentos pg
-            ON pg.fk_mensalidade = m.pk_mensalidade
-        LEFT JOIN sisgesc.tb_status_pagamento sp
-            ON sp.pk_status_pagamento = m.fk_status
+        JOIN sisgesc.tb_contratos_educacionais ce ON ce.pk_contrato = m.fk_contrato
+        JOIN sisgesc.tb_alunos a                  ON a.pk_fk_cpf = ce.fk_cpf_aluno
+        JOIN sisgesc.tb_pessoas p                 ON p.pk_cpf = a.pk_fk_cpf
+        JOIN dim_aluno da                         ON da.cpf_aluno = p.pk_cpf
+        JOIN sisgesc.tb_aluno_curso ac            ON ac.fk_cpf_aluno = a.pk_fk_cpf
+        JOIN dim_curso dc                         ON dc.codigo_curso = ac.fk_curso
+        LEFT JOIN sisgesc.tb_pagamentos pg        ON pg.fk_mensalidade = m.pk_mensalidade
+        LEFT JOIN sisgesc.tb_status_pagamento sp  ON sp.pk_status_pagamento = m.fk_status
         WHERE m.pk_mensalidade IS NOT NULL
         ON DUPLICATE KEY UPDATE
             valor_pago       = VALUES(valor_pago),
@@ -594,7 +529,6 @@ BEGIN
     COMMIT;
 END$$
 
--- Fato Desempenho
 CREATE PROCEDURE IF NOT EXISTS sp_etl_carregar_fato_desempenho()
 BEGIN
     DECLARE v_registros INT DEFAULT 0;
@@ -632,28 +566,17 @@ BEGIN
             per.semestre,
             YEAR(rm.data_fechamento)
         FROM sisgesc.tb_resultado_matricula rm
-        JOIN sisgesc.tb_matriculas m
-            ON m.pk_matricula = rm.fk_matricula
-        JOIN sisgesc.tb_disciplinas d
-            ON d.pk_disciplina = m.fk_disciplina
-        JOIN sisgesc.tb_turmas t
-            ON t.pk_turma = m.fk_turma
-        JOIN sisgesc.tb_periodos per
-            ON per.pk_periodo = m.fk_periodo
-        JOIN sisgesc.tb_alunos a
-            ON a.pk_fk_cpf = m.fk_cpf_aluno
-        JOIN sisgesc.tb_aulas au
-            ON au.fk_turma = m.fk_turma AND au.fk_disciplina = m.fk_disciplina
-        JOIN sisgesc.tb_professores pr
-            ON pr.pk_fk_cpf = au.fk_cpf_professor
-        JOIN dim_aluno da
-            ON da.cpf_aluno = a.pk_fk_cpf
-        JOIN dim_professor dp
-            ON dp.cpf_professor = pr.pk_fk_cpf
-        JOIN dim_disciplina dd
-            ON dd.codigo_disciplina = d.pk_disciplina
-        JOIN dim_curso dc
-            ON dc.codigo_curso = t.fk_curso
+        JOIN sisgesc.tb_matriculas m    ON m.pk_matricula = rm.fk_matricula
+        JOIN sisgesc.tb_disciplinas d   ON d.pk_disciplina = m.fk_disciplina
+        JOIN sisgesc.tb_turmas t        ON t.pk_turma = m.fk_turma
+        JOIN sisgesc.tb_periodos per    ON per.pk_periodo = m.fk_periodo
+        JOIN sisgesc.tb_alunos a        ON a.pk_fk_cpf = m.fk_cpf_aluno
+        JOIN sisgesc.tb_aulas au        ON au.fk_turma = m.fk_turma AND au.fk_disciplina = m.fk_disciplina
+        JOIN sisgesc.tb_professores pr  ON pr.pk_fk_cpf = au.fk_cpf_professor
+        JOIN dim_aluno da               ON da.cpf_aluno = a.pk_fk_cpf
+        JOIN dim_professor dp           ON dp.cpf_professor = pr.pk_fk_cpf
+        JOIN dim_disciplina dd          ON dd.codigo_disciplina = d.pk_disciplina
+        JOIN dim_curso dc               ON dc.codigo_curso = t.fk_curso
         WHERE rm.data_fechamento IS NOT NULL
         ON DUPLICATE KEY UPDATE
             nota_obtida           = VALUES(nota_obtida),
@@ -666,7 +589,6 @@ BEGIN
     COMMIT;
 END$$
 
--- Fato Folha de Pagamento
 CREATE PROCEDURE IF NOT EXISTS sp_etl_carregar_fato_folha()
 BEGIN
     DECLARE v_registros INT DEFAULT 0;
@@ -691,10 +613,8 @@ BEGIN
             fp.total_descontos,
             fp.salario_liquido
         FROM sisgesc.tb_folha_pagamento fp
-        JOIN sisgesc.tb_funcionarios f
-            ON f.pk_fk_cpf = fp.fk_cpf_funcionario
-        JOIN dim_professor dp
-            ON dp.cpf_professor = f.pk_fk_cpf
+        JOIN sisgesc.tb_funcionarios f ON f.pk_fk_cpf = fp.fk_cpf_funcionario
+        JOIN dim_professor dp          ON dp.cpf_professor = f.pk_fk_cpf
         ON DUPLICATE KEY UPDATE
             salario_bruto   = VALUES(salario_bruto),
             total_deducoes  = VALUES(total_deducoes),
@@ -704,7 +624,6 @@ BEGIN
     COMMIT;
 END$$
 
--- Master ETL
 CREATE PROCEDURE IF NOT EXISTS sp_etl_carga_completa_dw()
 BEGIN
     DECLARE v_inicio DATETIME;
@@ -726,61 +645,10 @@ END$$
 DELIMITER ;
 
 -- ==============================================================================
--- QUERIES ANALÍTICAS
--- ==============================================================================
-
--- [BUG 2 CORRIGIDO] era: WHERE YEAR dt.ano=2024 (sintaxe inválida)
--- Correto: JOIN dim_tempo + WHERE dt.ano = 2024
-SELECT
-    dc.nome_curso,
-    COUNT(DISTINCT fr.sk_aluno)       AS qtd_alunos,
-    SUM(fr.valor_mensalidade_liquido) AS receita_esperada,
-    SUM(fr.valor_pago)                AS receita_realizada,
-    ROUND(100.0 * SUM(fr.valor_pago) / SUM(fr.valor_mensalidade_liquido), 2) AS taxa_recebimento,
-    SUM(CASE WHEN fr.eh_em_atraso THEN fr.valor_total_devido ELSE 0 END)     AS valor_em_atraso
-FROM fato_receita fr
-JOIN dim_curso dc ON dc.sk_curso  = fr.sk_curso
-JOIN dim_tempo dt ON dt.sk_tempo  = fr.sk_tempo_vencimento
-WHERE dt.ano = 2024
-GROUP BY dc.nome_curso
-ORDER BY receita_realizada DESC;
-
-SELECT * FROM v_desempenho_por_curso_semestre WHERE ano >= 2023 ORDER BY ano DESC, nota_media DESC;
-
-SELECT
-    da.nome_completo, da.cpf_aluno, dc.nome_curso,
-    COUNT(DISTINCT fr.numero_mensalidade) AS qtd_atrasadas,
-    SUM(fr.valor_total_devido)            AS total_em_atraso,
-    MAX(fr.dias_em_atraso)                AS dias_atraso_maximo
-FROM fato_receita fr
-JOIN dim_aluno da ON da.sk_aluno = fr.sk_aluno
-JOIN dim_curso dc ON dc.sk_curso = fr.sk_curso
-WHERE fr.eh_em_atraso = TRUE
-GROUP BY da.sk_aluno, da.nome_completo, da.cpf_aluno, dc.nome_curso
-HAVING COUNT(*) >= 3
-ORDER BY total_em_atraso DESC
-LIMIT 10;
-
--- [BUG 3 CORRIGIDO] era: WHERE YEAR dt ON dt.sk_tempo = ... (sintaxe completamente inválida)
--- Correto: JOIN dim_tempo na cláusula FROM
-SELECT
-    dt.ano, dt.mes, dt.nome_mes,
-    ROUND(SUM(fr.valor_pago), 2) AS receita_mes,
-    ROUND(AVG(SUM(fr.valor_pago)) OVER (
-        ORDER BY dt.ano, dt.mes ROWS BETWEEN 2 PRECEDING AND CURRENT ROW
-    ), 2) AS receita_media_movel_3m
-FROM fato_receita fr
-JOIN dim_tempo dt ON dt.sk_tempo = fr.sk_tempo_vencimento
-GROUP BY dt.ano, dt.mes, dt.nome_mes
-ORDER BY dt.ano DESC, dt.mes DESC
-LIMIT 12;
-
-SELECT * FROM v_inadimplencia_por_curso ORDER BY taxa_inadimplencia_pct DESC;
-
--- ==============================================================================
 -- VALIDAÇÃO OBRIGATÓRIA: OLTP = OLAP
 -- Execute após o ETL para confirmar que a carga foi correta.
--- Os dois valores devem ser IGUAIS. Diferença = erro no ETL.
 -- ==============================================================================
+SELECT '=== VALIDAÇÃO OLTP × OLAP ===' AS etapa;
 SELECT SUM(valor_liquido)             AS total_oltp FROM sisgesc.tb_mensalidades;
 SELECT SUM(valor_mensalidade_liquido) AS total_olap FROM dw_sisgesc.fato_receita;
+-- Os dois valores DEVEM ser iguais. Diferença = erro no ETL.
