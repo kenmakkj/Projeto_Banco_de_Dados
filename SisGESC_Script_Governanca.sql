@@ -2,13 +2,6 @@
 -- SisGESC — Script de Governança e Performance — VERSÃO CORRIGIDA
 -- Sistema de Gestão Escolar — Universidade Privada
 --
--- CORREÇÕES APLICADAS (Fase 5 — Performance e Governança):
---   [1] EXPLAIN adicionado ANTES da criação dos índices (baseline de performance).
---   [2] EXPLAIN adicionado DEPOIS da criação dos índices (prova de ganho).
---   [3] Bloco de documentação textual comparando os planos de execução.
---   [4] Script de reset (DROP/TRUNCATE) mantido e organizado.
---   [5] Tabela de controle de versão (tb_schema_version) incluída.
--- =============================================================================
 
 USE sisgesc;
 
