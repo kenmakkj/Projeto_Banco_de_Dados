@@ -1,16 +1,11 @@
--- =============================================================================
 -- SisGESC — Script DML (MySQL) — VERSÃO CORRIGIDA
 -- Sistema de Gestão Escolar — Universidade Privada
---
 USE sisgesc;
 
--- =============================================================================
--- ██████████████████████████████████████████████████████████████████████████
 -- PASSO 1 — CONTAGEM INICIAL (ANTES DA CARGA)
 -- Execute este bloco ANTES de rodar os INSERTs.
 -- Guarde o resultado para comparar com o PASSO 3.
--- ██████████████████████████████████████████████████████████████████████████
--- =============================================================================
+
 SELECT '=== CONTAGEM INICIAL (ANTES DA CARGA) ===' AS etapa;
 
 SELECT 'tb_pessoas'                  AS tabela, COUNT(*) AS total FROM tb_pessoas               UNION ALL
@@ -63,15 +58,11 @@ SELECT 'tb_contrato_desconto',                  COUNT(*)          FROM tb_contra
 SELECT 'tb_mensalidades',                       COUNT(*)          FROM tb_mensalidades           UNION ALL
 SELECT 'tb_pagamentos',                         COUNT(*)          FROM tb_pagamentos;
 
--- =============================================================================
 -- PASSO 2 — CARGA DE DADOS (INSERTs com INSERT IGNORE — idempotentes)
--- =============================================================================
 
 SELECT '=== INICIANDO CARGA DE DADOS ===' AS etapa;
 
--- -----------------------------------------------------------------------
 -- BASE / PESSOAS
--- -----------------------------------------------------------------------
 
 INSERT IGNORE INTO tb_cep (pk_cep, logradouro, bairro, cidade, estado) VALUES
 ('01310100', 'Avenida Paulista',              'Bela Vista',           'São Paulo',      'SP'),
@@ -156,9 +147,7 @@ INSERT IGNORE INTO tb_emails (fk_cpf, email, tipo) VALUES
 ('44455566688', 'simone.barbosa@sisgesc.edu.br',         'Institucional'),
 ('55566677799', 'andre.gomes@sisgesc.edu.br',            'Institucional');
 
--- -----------------------------------------------------------------------
 -- MÓDULO ACADÊMICO
--- -----------------------------------------------------------------------
 
 INSERT IGNORE INTO tb_tipo_curso (pk_tipo_curso, descricao) VALUES
 (1, 'Graduação'),
@@ -256,9 +245,7 @@ INSERT IGNORE INTO tb_turmas (pk_turma, fk_curso, nome_turma, periodo, ano_ingre
 (4, 1, 'ADS-2024-N', 'Noturno',  2024),
 (5, 4, 'GRH-2024-N', 'Noturno',  2024);
 
--- -----------------------------------------------------------------------
 -- MÓDULO RH
--- -----------------------------------------------------------------------
 
 INSERT IGNORE INTO tb_departamentos (pk_departamento, nome) VALUES
 (1, 'Acadêmico'),
@@ -392,9 +379,7 @@ INSERT IGNORE INTO tb_afastamentos (fk_cpf_funcionario, fk_tipo, data_inicio, da
 ('22233344466', 1, '2024-09-10', '2024-09-20', 'Cirurgia eletiva — atestado médico anexado'),
 ('33344455577', 3, '2025-02-17', '2025-02-22', 'Licença paternidade legal de 5 dias');
 
--- -----------------------------------------------------------------------
 -- MÓDULO ACADÊMICO — continuação (depende de professores e turmas)
--- -----------------------------------------------------------------------
 
 INSERT IGNORE INTO tb_aulas (fk_turma, fk_disciplina, fk_cpf_professor, fk_sala, fk_periodo, dia_semana, horario_inicio, horario_fim) VALUES
 (1, 1, '99900011122', 4, 1, 2, '19:00:00', '21:00:00'),
@@ -471,9 +456,7 @@ INSERT IGNORE INTO tb_faltas (pk_falta, fk_matricula, data_falta, quantidade) VA
 (6, 10, '2025-03-18', 1),
 (7, 12, '2025-03-06', 1);
 
--- -----------------------------------------------------------------------
 -- MÓDULO FINANCEIRO
--- -----------------------------------------------------------------------
 
 INSERT IGNORE INTO tb_status_pagamento (pk_status_pagamento, descricao) VALUES
 (1, 'Pendente'),
@@ -544,9 +527,8 @@ INSERT IGNORE INTO tb_pagamentos (pk_pagamento, fk_mensalidade, valor_pago, meio
 
 SELECT '=== CARGA CONCLUÍDA ===' AS etapa;
 
--- =============================================================================
 -- PASSO 3 — CONTAGEM FINAL (APÓS A CARGA / REEXECUÇÃO)
--- ██████████████████████████████████████████████████████████████████████████
+
 -- REGRA DE IDEMPOTÊNCIA:
 --   Os totais abaixo DEVEM ser IDÊNTICOS ao resultado do PASSO 1.
 --   Se qualquer valor aumentar após reexecução, a idempotência foi violada.
@@ -607,9 +589,7 @@ SELECT '=== CARGA CONCLUÍDA ===' AS etapa;
 --   tb_descontos_bolsas      =  5
 
 --   tb_mensalidades          = 15
---   tb_pagamentos            = 10
--- ██████████████████████████████████████████████████████████████████████████
--- =============================================================================
+--   tb_pagamentos            = 10 
 
 SELECT '=== CONTAGEM FINAL (APÓS A CARGA / PROVA DE IDEMPOTÊNCIA) ===' AS etapa;
 
