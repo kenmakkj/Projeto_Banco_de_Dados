@@ -1,6 +1,6 @@
 # SisGESC — Sistema de Gestão Escolar
 
-<<<<<<< HEAD
+HEAD
 Projeto acadêmico (MySQL 8+): OLTP (`sisgesc`) com módulos Acadêmico, Financeiro e RH, mais camada OLAP (`dw_sisgesc`) com Star Schema e ETL.
 
 ## Pré-requisitos
@@ -25,10 +25,7 @@ Documentação em PDF: `Dicionario_Sisgesc.pdf`, `Diagrama Final .pdf`, `SisGESC
 ## Como executar (instalação única)
 
 Na pasta do projeto:
-=======
-> Projeto acadêmico de modelagem e implementação de banco de dados relacional para universidade privada, desenvolvido com MySQL. Arquitetura em 3FN com módulos OLTP (Acadêmico, Financeiro, RH) e camada OLAP (Data Warehouse / Star Schema).
-
----
+Projeto acadêmico de modelagem e implementação de banco de dados relacional para universidade privada, desenvolvido com MySQL. Arquitetura em 3FN com módulos OLTP (Acadêmico, Financeiro, RH) e camada OLAP (Data Warehouse / Star Schema).
 
 ## Sumário
 
@@ -43,8 +40,6 @@ Na pasta do projeto:
 9. [Regras de Negócio Implementadas](#regras-de-negócio-implementadas)
 10. [Módulos do Sistema](#módulos-do-sistema)
 
----
-
 ## Visão Geral
 
 O **SisGESC** é um sistema de gestão escolar projetado para universidades privadas, estruturado sobre três pilares:
@@ -57,15 +52,11 @@ O **SisGESC** é um sistema de gestão escolar projetado para universidades priv
 
 O banco OLTP (`sisgesc`) é espelhado para um Data Warehouse (`dw_sisgesc`) via processo ETL, habilitando análises OLAP por meio de Star Schema.
 
----
-
 ## Pré-requisitos
 
 - **MySQL** versão 8.0 ou superior (necessário para `CREATE INDEX IF NOT EXISTS` e window functions)
 - **MySQL Workbench**, **DBeaver** ou cliente de linha de comando `mysql`
 - Usuário com permissões de `CREATE DATABASE`, `CREATE TABLE`, `CREATE VIEW`, `CREATE PROCEDURE` e `CREATE INDEX`
-
----
 
 ## Estrutura do Repositório
 
@@ -87,9 +78,6 @@ SisGESC/
 │
 └── README.md                                ← Este arquivo
 ```
-
----
-
 ## Como Executar — Passo a Passo
 
 ### Opção 1 — Script Único (Recomendada)
@@ -101,7 +89,7 @@ Execute o `run_all.sql` pela linha de comando. Ele automaticamente chama todos o
 mysql -u root -p < run_all.sql
 ```
 
-<<<<<<< HEAD
+HEAD
 O `run_all.sql` usa `SOURCE` para encadear os outros `.sql` — **têm de estar no mesmo diretório** de onde invoca o cliente, ou execute os passos manualmente na ordem do ficheiro.
 
 Após a carga OLAP, o script chama `CALL sp_etl_carga_completa_dw();` automaticamente.
@@ -131,8 +119,6 @@ Os totais devem coincidir após o ETL.
 *SisGESC — entrega académica de Banco de Dados.*
 =======
 > **Atenção:** O `run_all.sql` usa `SOURCE` para encadear os scripts. Todos os arquivos `.sql` devem estar no mesmo diretório. Se estiver usando MySQL Workbench ou DBeaver, abra o `run_all.sql` e execute como script (não como query individual).
-
----
 
 ### Opção 2 — Execução Manual (Script por Script)
 
@@ -183,8 +169,6 @@ SOURCE SisGESC_Script_Governanca_corrigido.sql;
 
 Executa o `EXPLAIN` **antes** dos índices (baseline), cria os índices e executa o `EXPLAIN` **depois** para demonstrar o ganho de performance.
 
----
-
 ## Prova de Idempotência (Fase 2)
 
 O script `SisGESC_Script_DML_corrigido.sql` está dividido em **3 passos**:
@@ -198,8 +182,6 @@ O script `SisGESC_Script_DML_corrigido.sql` está dividido em **3 passos**:
 **Como validar:** Execute o script inteiro **duas vezes**. Os valores do Passo 1 e do Passo 3 devem ser **exatamente iguais** na segunda execução. Se qualquer total aumentar, a idempotência foi violada.
 
 O `INSERT IGNORE` é o mecanismo que garante isso: ao encontrar uma chave primária ou unique já existente, o MySQL simplesmente descarta o INSERT sem erro.
-
----
 
 ## Performance e Índices (Fase 5)
 
@@ -234,8 +216,6 @@ tb_faltas      → type: ref,   key: idx_falta_matricula,    rows: ~2
 
 **Ganho:** redução de ~83% nas linhas lidas. Custo passa de O(N) para O(log N).
 
----
-
 ## Data Warehouse e ETL (Fase 4)
 
 O banco `dw_sisgesc` implementa Star Schema com:
@@ -264,8 +244,6 @@ SELECT SUM(valor_mensalidade_liquido) AS total_olap FROM dw_sisgesc.fato_receita
 ```
 
 Os dois valores **devem ser iguais**. Diferença indica erro no ETL.
-
----
 
 ## Modelagem OLAP — Star Schema (DER)
 
@@ -364,8 +342,6 @@ erDiagram
 - O DER OLTP permanece intacto. O Star Schema é um novo diagrama independente.
 - A ligação entre os dois mundos é feita pelas stored procedures ETL (`sp_etl_*`), que leem do `sisgesc` e escrevem no `dw_sisgesc`.
 
----
-
 ## Regras de Negócio Implementadas
 
 | ID | Mecanismo | Localização |
@@ -387,8 +363,6 @@ erDiagram
 | RN15 | DEFAULT 0 + VIEW vw_mensalidades | DDL + VIEW |
 | RN16 | CHECK (genero IN ('M', 'F', 'O')) | DDL tb_pessoas |
 
----
-
 ## Módulos do Sistema
 
 ### Módulo Acadêmico
@@ -403,7 +377,5 @@ Gerencia funcionários e professores (herança 1:1 via CPF), folha de pagamento 
 ### Data Warehouse (OLAP)
 Camada analítica com Star Schema, views de inadimplência por curso, desempenho acadêmico e custo operacional por departamento. Processo ETL noturno via stored procedures.
 
----
-
 *Projeto desenvolvido como entrega final da disciplina de Banco de Dados — SisGESC v6.0*
->>>>>>> 24d4a75c507c4d78d906313fc99809df8bd6b6e8
+24d4a75c507c4d78d906313fc99809df8bd6b6e8
