@@ -56,20 +56,6 @@ DROP VIEW  IF EXISTS vw_folha_pagamento;
 
 SET FOREIGN_KEY_CHECKS = 1;
 
--- =============================================================================
--- SEÇÃO II — PERFORMANCE E GOVERNANÇA (FASE 5)
->>>>>>> 24d4a75c507c4d78d906313fc99809df8bd6b6e8
--- ══════════════════════════════════════════════════════════════════════════════
--- OBJETIVO: demonstrar o impacto dos índices usando EXPLAIN antes e depois.
--- CONSULTA DE REFERÊNCIA: boletim completo de um aluno (JOIN pesado por CPF).
--- ══════════════════════════════════════════════════════════════════════════════
-
--- ─────────────────────────────────────────────────────────────────────────────
--- FASE A — EXPLAIN ANTES DA CRIAÇÃO DOS ÍNDICES (BASELINE)
--- ─────────────────────────────────────────────────────────────────────────────
--- Execute este bloco ANTES de criar os índices da Fase B.
--- Observe os valores de type, rows e Extra para cada tabela no plano.
--- ─────────────────────────────────────────────────────────────────────────────
 
 SELECT '=== FASE A: EXPLAIN SEM ÍNDICES (BASELINE) ===' AS fase;
 
@@ -301,14 +287,6 @@ SELECT '=== FASE C CONCLUÍDA ===' AS fase;
 ║  alunos e mensalidades, o ganho seria exponencial.                           ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
 */
-
--- =============================================================================
-<<<<<<< HEAD
--- SEÇÃO II — CONTROLE DE VERSÃO DO SCHEMA
-=======
--- SEÇÃO III — CONTROLE DE VERSÃO DO SCHEMA
->>>>>>> 24d4a75c507c4d78d906313fc99809df8bd6b6e8
--- =============================================================================
 
 CREATE TABLE IF NOT EXISTS tb_schema_version (
   pk_id         INT          NOT NULL AUTO_INCREMENT COMMENT 'ID sequencial da migração',
