@@ -1,7 +1,5 @@
--- =============================================================================
 -- SisGESC — Data Warehouse & OLAP — VERSÃO CORRIGIDA
 -- Arquivo: SisGESC_Data_Warehouse_OLAP_corrigido.sql
--- =============================================================================
 
 CREATE DATABASE IF NOT EXISTS dw_sisgesc
   CHARACTER SET utf8mb4
@@ -690,9 +688,8 @@ END $$
 
 DELIMITER ;
 
--- =============================================================================
 -- VALIDAÇÃO OBRIGATÓRIA: OLTP = OLAP (prova de idempotência)
--- =============================================================================
+
 SELECT '=== VALIDAÇÃO OLTP × OLAP ===' AS etapa;
 SELECT SUM(valor_liquido)             AS total_oltp FROM sisgesc.tb_mensalidades;
 SELECT SUM(valor_mensalidade_liquido) AS total_olap FROM dw_sisgesc.fato_receita;
