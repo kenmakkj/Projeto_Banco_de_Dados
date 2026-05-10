@@ -1,7 +1,5 @@
--- =============================================================================
 -- SisGESC — Stored Procedures OLTP (MySQL 8+) — VERSÃO CORRIGIDA
 -- Alinhado ao Dicionário de Dados (Dicionario_Sisgesc.pdf)
--- =============================================================================
 
 USE sisgesc;
 
@@ -494,9 +492,7 @@ END $$
 
 DELIMITER ;
 
--- =============================================================================
 -- CONSULTAS COM SUBCONSULTAS — Fase 3
--- =============================================================================
 
 -- S1 — Alunos com média final acima da média geral dos resultados fechados
 SELECT DISTINCT
