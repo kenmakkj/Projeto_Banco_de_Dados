@@ -1,13 +1,18 @@
 -- =============================================================================
--- SisGESC — Script DDL (MySQL)
+-- SisGESC — Script DDL (MySQL 8+)
 -- Sistema de Gestão Escolar — Universidade Privada
 -- Modelagem relacional em 3FN (Terceira Forma Normal)
+-- Versão: CORRIGIDA
+--
 --
 -- Módulos:
 --   1. Base / Pessoas       — identidade, endereços, contatos
 --   2. Módulo Acadêmico     — cursos, alunos, matrículas, notas, faltas
 --   3. Módulo RH            — funcionários, folha, férias, afastamentos
 --   4. Módulo Financeiro    — contratos, mensalidades, pagamentos, bolsas
+--   5. Views                — campos calculados (3FN)
+--   6. Índices              — otimização de desempenho
+--   7. Consultas de validação JOIN geral
 -- =============================================================================
 
 CREATE DATABASE IF NOT EXISTS sisgesc
@@ -17,12 +22,12 @@ CREATE DATABASE IF NOT EXISTS sisgesc
 USE sisgesc;
 
 -- =============================================================================
--- BASE / PESSOAS
+-- 1. BASE / PESSOAS
 -- Centraliza a identidade de alunos, professores e funcionários via CPF.
 -- Resolve endereços em 3FN separando CEP em tabela própria.
 -- =============================================================================
 
-CREATE TABLE tb_pessoas (
+CREATE TABLE IF NOT EXISTS tb_pessoas (
   pk_cpf             CHAR(11)     NOT NULL,
   primeiro_nome      VARCHAR(40)  NOT NULL,
   sobrenome          VARCHAR(50)  NOT NULL,
@@ -32,10 +37,10 @@ CREATE TABLE tb_pessoas (
   data_criacao       TIMESTAMP    NOT NULL DEFAULT NOW(),
   ultima_atualizacao TIMESTAMP    NOT NULL DEFAULT NOW(),
   CONSTRAINT pk_pessoas    PRIMARY KEY (pk_cpf),
-  CONSTRAINT ck_genero     CHECK       (genero IN ('M', 'F', 'O'))
+  CONSTRAINT ck_genero     CHECK       (genero IN ('M', 'F', 'O'))   -- RN16
 );
 
-CREATE TABLE tb_cep (
+CREATE TABLE IF NOT EXISTS tb_cep (
   pk_cep     CHAR(8)      NOT NULL,
   logradouro VARCHAR(100) NOT NULL,
   bairro     VARCHAR(50)  NOT NULL,
@@ -44,7 +49,7 @@ CREATE TABLE tb_cep (
   CONSTRAINT pk_cep PRIMARY KEY (pk_cep)
 );
 
-CREATE TABLE tb_enderecos (
+CREATE TABLE IF NOT EXISTS tb_enderecos (
   fk_cpf             CHAR(11)    NOT NULL,
   tipo_endereco      VARCHAR(20) NOT NULL COMMENT 'Residencial, Comercial',
   fk_cep             CHAR(8)     NOT NULL,
@@ -57,7 +62,7 @@ CREATE TABLE tb_enderecos (
   CONSTRAINT fk_end_cep       FOREIGN KEY (fk_cep) REFERENCES tb_cep(pk_cep)
 );
 
-CREATE TABLE tb_telefones (
+CREATE TABLE IF NOT EXISTS tb_telefones (
   pk_telefone INT         NOT NULL AUTO_INCREMENT,
   fk_cpf      CHAR(11)    NOT NULL,
   ddd         CHAR(2)     NOT NULL,
@@ -67,7 +72,7 @@ CREATE TABLE tb_telefones (
   CONSTRAINT fk_tel_cpf       FOREIGN KEY (fk_cpf) REFERENCES tb_pessoas(pk_cpf)
 );
 
-CREATE TABLE tb_emails (
+CREATE TABLE IF NOT EXISTS tb_emails (
   pk_email INT         NOT NULL AUTO_INCREMENT,
   fk_cpf   CHAR(11)    NOT NULL,
   email    VARCHAR(70) NOT NULL,
@@ -78,19 +83,19 @@ CREATE TABLE tb_emails (
 );
 
 -- =============================================================================
--- MÓDULO ACADÊMICO
+-- 2. MÓDULO ACADÊMICO
 -- Gerencia cursos, alunos, matrículas, avaliações, notas, faltas e aulas.
--- Aplica regras de negócio RN01–RN10 via constraints e lógica de aplicação.
+-- Aplica RN01–RN10 via constraints e lógica de aplicação.
 -- =============================================================================
 
-CREATE TABLE tb_tipo_curso (
+CREATE TABLE IF NOT EXISTS tb_tipo_curso (
   pk_tipo_curso INT         NOT NULL AUTO_INCREMENT,
-  descricao     VARCHAR(30) NOT NULL COMMENT 'Graduação, Pós, Extensão',
+  descricao     VARCHAR(30) NOT NULL COMMENT 'Graduação, Pós-Graduação, Extensão',
   CONSTRAINT pk_tipo_curso  PRIMARY KEY (pk_tipo_curso),
   CONSTRAINT uq_tipo_curso  UNIQUE      (descricao)
 );
 
-CREATE TABLE tb_cursos (
+CREATE TABLE IF NOT EXISTS tb_cursos (
   pk_curso           INT         NOT NULL AUTO_INCREMENT,
   nome               VARCHAR(70) NOT NULL,
   fk_tipo_curso      INT         NOT NULL,
@@ -101,14 +106,14 @@ CREATE TABLE tb_cursos (
   CONSTRAINT fk_curso_tipo    FOREIGN KEY (fk_tipo_curso) REFERENCES tb_tipo_curso(pk_tipo_curso)
 );
 
-CREATE TABLE tb_status_aluno (
+CREATE TABLE IF NOT EXISTS tb_status_aluno (
   pk_status_aluno INT         NOT NULL,
   descricao       VARCHAR(20) NOT NULL COMMENT 'ativo, trancado, desistente, formado',
   CONSTRAINT pk_status_aluno    PRIMARY KEY (pk_status_aluno),
   CONSTRAINT uq_status_aluno    UNIQUE      (descricao)
 );
 
-CREATE TABLE tb_alunos (
+CREATE TABLE IF NOT EXISTS tb_alunos (
   pk_fk_cpf              CHAR(11)  NOT NULL,
   rgm                    INT       NOT NULL,
   data_matricula_inicial DATE      NOT NULL,
@@ -121,7 +126,7 @@ CREATE TABLE tb_alunos (
   CONSTRAINT fk_aluno_status  FOREIGN KEY (fk_status) REFERENCES tb_status_aluno(pk_status_aluno)
 );
 
-CREATE TABLE tb_aluno_curso (
+CREATE TABLE IF NOT EXISTS tb_aluno_curso (
   pk_aluno_curso INT      NOT NULL AUTO_INCREMENT,
   fk_cpf_aluno   CHAR(11) NOT NULL,
   fk_curso       INT      NOT NULL,
@@ -133,7 +138,7 @@ CREATE TABLE tb_aluno_curso (
   CONSTRAINT fk_ac_curso      FOREIGN KEY (fk_curso)     REFERENCES tb_cursos(pk_curso)
 );
 
-CREATE TABLE tb_historico_status_aluno (
+CREATE TABLE IF NOT EXISTS tb_historico_status_aluno (
   pk_hist      INT      NOT NULL AUTO_INCREMENT,
   fk_cpf_aluno CHAR(11) NOT NULL,
   fk_status    INT      NOT NULL,
@@ -145,17 +150,16 @@ CREATE TABLE tb_historico_status_aluno (
   CONSTRAINT fk_hsa_status         FOREIGN KEY (fk_status)    REFERENCES tb_status_aluno(pk_status_aluno)
 );
 
-CREATE TABLE tb_disciplinas (
+CREATE TABLE IF NOT EXISTS tb_disciplinas (
   pk_disciplina INT         NOT NULL AUTO_INCREMENT,
   nome          VARCHAR(60) NOT NULL,
   carga_horaria INT         NOT NULL,
-
   CONSTRAINT pk_disciplinas      PRIMARY KEY (pk_disciplina),
   CONSTRAINT uq_disciplinas_nome UNIQUE      (nome),
-  CONSTRAINT ck_carga_horaria    CHECK       (carga_horaria >= 40)
+  CONSTRAINT ck_carga_horaria    CHECK       (carga_horaria >= 40)  -- RN03
 );
 
-CREATE TABLE tb_grade_curricular (
+CREATE TABLE IF NOT EXISTS tb_grade_curricular (
   fk_curso          INT NOT NULL,
   fk_disciplina     INT NOT NULL,
   semestre_sugerido INT NOT NULL,
@@ -164,8 +168,7 @@ CREATE TABLE tb_grade_curricular (
   CONSTRAINT fk_gc_disciplina    FOREIGN KEY (fk_disciplina) REFERENCES tb_disciplinas(pk_disciplina)
 );
 
-
-CREATE TABLE tb_pre_requisitos (
+CREATE TABLE IF NOT EXISTS tb_pre_requisitos (
   fk_disciplina INT NOT NULL,
   fk_requisito  INT NOT NULL,
   CONSTRAINT pk_pre_requisitos PRIMARY KEY (fk_disciplina, fk_requisito),
@@ -173,8 +176,7 @@ CREATE TABLE tb_pre_requisitos (
   CONSTRAINT fk_pr_requisito   FOREIGN KEY (fk_requisito)  REFERENCES tb_disciplinas(pk_disciplina)
 );
 
-
-CREATE TABLE tb_periodos (
+CREATE TABLE IF NOT EXISTS tb_periodos (
   pk_periodo INT NOT NULL AUTO_INCREMENT,
   ano        INT NOT NULL,
   semestre   INT NOT NULL,
@@ -184,7 +186,7 @@ CREATE TABLE tb_periodos (
   CONSTRAINT ck_semestre    CHECK       (semestre IN (1, 2))
 );
 
-CREATE TABLE tb_turmas (
+CREATE TABLE IF NOT EXISTS tb_turmas (
   pk_turma      INT         NOT NULL AUTO_INCREMENT,
   fk_curso      INT         NOT NULL,
   nome_turma    VARCHAR(50) NOT NULL,
@@ -195,21 +197,21 @@ CREATE TABLE tb_turmas (
   CONSTRAINT fk_turma_curso  FOREIGN KEY (fk_curso) REFERENCES tb_cursos(pk_curso)
 );
 
-CREATE TABLE tb_matriculas (
+CREATE TABLE IF NOT EXISTS tb_matriculas (
   pk_matricula  INT      NOT NULL AUTO_INCREMENT,
   fk_cpf_aluno  CHAR(11) NOT NULL,
   fk_disciplina INT      NOT NULL,
   fk_periodo    INT      NOT NULL,
   fk_turma      INT      NOT NULL,
   CONSTRAINT pk_matriculas      PRIMARY KEY (pk_matricula),
-  CONSTRAINT uq_matriculas      UNIQUE      (fk_cpf_aluno, fk_disciplina, fk_periodo),
+  CONSTRAINT uq_matriculas      UNIQUE      (fk_cpf_aluno, fk_disciplina, fk_periodo),  -- RN05
   CONSTRAINT fk_mat_aluno       FOREIGN KEY (fk_cpf_aluno)  REFERENCES tb_alunos(pk_fk_cpf),
   CONSTRAINT fk_mat_disciplina  FOREIGN KEY (fk_disciplina) REFERENCES tb_disciplinas(pk_disciplina),
   CONSTRAINT fk_mat_periodo     FOREIGN KEY (fk_periodo)    REFERENCES tb_periodos(pk_periodo),
   CONSTRAINT fk_mat_turma       FOREIGN KEY (fk_turma)      REFERENCES tb_turmas(pk_turma)
 );
 
-CREATE TABLE tb_resultado_matricula (
+CREATE TABLE IF NOT EXISTS tb_resultado_matricula (
   pk_resultado    INT          NOT NULL AUTO_INCREMENT,
   fk_matricula    INT          NOT NULL,
   situacao        VARCHAR(20)  NOT NULL COMMENT 'aprovado, reprovado, trancado, cursando',
@@ -217,22 +219,22 @@ CREATE TABLE tb_resultado_matricula (
   total_faltas    INT          NULL,
   data_fechamento DATE         NULL,
   CONSTRAINT pk_resultado_matricula PRIMARY KEY (pk_resultado),
-  CONSTRAINT uq_resultado_matricula UNIQUE      (fk_matricula),
+  CONSTRAINT uq_resultado_matricula UNIQUE      (fk_matricula),        -- garante 1:1 com tb_matriculas
   CONSTRAINT fk_res_matricula       FOREIGN KEY (fk_matricula) REFERENCES tb_matriculas(pk_matricula)
 );
 
-CREATE TABLE tb_avaliacoes (
+CREATE TABLE IF NOT EXISTS tb_avaliacoes (
   pk_avaliacao  INT          NOT NULL AUTO_INCREMENT,
   fk_disciplina INT          NOT NULL,
   descricao     VARCHAR(50)  NOT NULL COMMENT 'P1, P2, Trabalho',
   peso          DECIMAL(3,2) NOT NULL,
-  data_limite_alteracao DATE         NULL,
+  data_limite_alteracao DATE NULL,
   CONSTRAINT pk_avaliacoes       PRIMARY KEY (pk_avaliacao),
   CONSTRAINT ck_peso_avaliacao   CHECK       (peso BETWEEN 0 AND 1),
   CONSTRAINT fk_aval_disciplina  FOREIGN KEY (fk_disciplina) REFERENCES tb_disciplinas(pk_disciplina)
 );
 
-CREATE TABLE tb_notas (
+CREATE TABLE IF NOT EXISTS tb_notas (
   pk_nota          INT          NOT NULL AUTO_INCREMENT,
   fk_matricula     INT          NOT NULL,
   fk_avaliacao     INT          NOT NULL,
@@ -247,8 +249,7 @@ CREATE TABLE tb_notas (
   CONSTRAINT fk_nota_professor FOREIGN KEY (fk_cpf_professor) REFERENCES tb_professores(pk_fk_cpf)
 );
 
-
-CREATE TABLE tb_log_notas (
+CREATE TABLE IF NOT EXISTS tb_log_notas (
   pk_log           INT          NOT NULL AUTO_INCREMENT,
   fk_nota          INT          NOT NULL,
   valor_antigo     DECIMAL(4,2) NOT NULL,
@@ -261,7 +262,7 @@ CREATE TABLE tb_log_notas (
   CONSTRAINT fk_log_professor  FOREIGN KEY (fk_cpf_professor) REFERENCES tb_professores(pk_fk_cpf)
 );
 
-CREATE TABLE tb_faltas (
+CREATE TABLE IF NOT EXISTS tb_faltas (
   pk_falta     INT  NOT NULL AUTO_INCREMENT,
   fk_matricula INT  NOT NULL,
   data_falta   DATE NOT NULL,
@@ -271,7 +272,7 @@ CREATE TABLE tb_faltas (
   CONSTRAINT fk_falta_matricula FOREIGN KEY (fk_matricula) REFERENCES tb_matriculas(pk_matricula)
 );
 
-CREATE TABLE tb_salas (
+CREATE TABLE IF NOT EXISTS tb_salas (
   pk_sala    INT         NOT NULL AUTO_INCREMENT,
   nome       VARCHAR(20) NOT NULL,
   capacidade INT         NOT NULL,
@@ -280,20 +281,21 @@ CREATE TABLE tb_salas (
   CONSTRAINT pk_salas PRIMARY KEY (pk_sala)
 );
 
-CREATE TABLE tb_aulas (
+CREATE TABLE IF NOT EXISTS tb_aulas (
   pk_aula          INT      NOT NULL AUTO_INCREMENT,
   fk_turma         INT      NOT NULL,
   fk_disciplina    INT      NOT NULL,
   fk_cpf_professor CHAR(11) NOT NULL,
   fk_sala          INT      NOT NULL,
   fk_periodo       INT      NOT NULL,
-  dia_semana       INT      NOT NULL COMMENT '1=Segunda, 2=Terça...',
+  dia_semana       INT      NOT NULL COMMENT '1=Segunda, 2=Terça, ..., 6=Sábado',
   horario_inicio   TIME     NOT NULL,
   horario_fim      TIME     NOT NULL,
   CONSTRAINT pk_aulas            PRIMARY KEY (pk_aula),
- 
+  -- CORREÇÃO: CHECK adicionado conforme dicionário de dados
+  CONSTRAINT ck_dia_semana       CHECK       (dia_semana BETWEEN 1 AND 6),
+  -- RN09 — índices UNIQUE impedem conflito de sala e de professor no mesmo horário/período
   CONSTRAINT uq_aulas_sala       UNIQUE      (fk_sala, dia_semana, horario_inicio, fk_periodo),
-
   CONSTRAINT uq_aulas_professor  UNIQUE      (fk_cpf_professor, dia_semana, horario_inicio, fk_periodo),
   CONSTRAINT fk_aula_turma       FOREIGN KEY (fk_turma)         REFERENCES tb_turmas(pk_turma),
   CONSTRAINT fk_aula_disciplina  FOREIGN KEY (fk_disciplina)    REFERENCES tb_disciplinas(pk_disciplina),
@@ -303,13 +305,13 @@ CREATE TABLE tb_aulas (
 );
 
 -- =============================================================================
--- MÓDULO RH
+-- 3. MÓDULO RH
 -- Gerencia funcionários, professores, cargos, folha de pagamento,
 -- verbas, benefícios, férias e afastamentos.
--- Regras de negócio: RN12 e RN13 (integridade da folha).
+-- Regras: RN12 e RN13 (integridade da folha).
 -- =============================================================================
 
-CREATE TABLE tb_departamentos (
+CREATE TABLE IF NOT EXISTS tb_departamentos (
   pk_departamento    INT         NOT NULL AUTO_INCREMENT,
   nome               VARCHAR(50) NOT NULL,
   data_criacao       TIMESTAMP   NOT NULL DEFAULT NOW(),
@@ -317,7 +319,7 @@ CREATE TABLE tb_departamentos (
   CONSTRAINT pk_departamentos PRIMARY KEY (pk_departamento)
 );
 
-CREATE TABLE tb_cargos (
+CREATE TABLE IF NOT EXISTS tb_cargos (
   pk_cargo           INT         NOT NULL AUTO_INCREMENT,
   nome               VARCHAR(50) NOT NULL,
   data_criacao       TIMESTAMP   NOT NULL DEFAULT NOW(),
@@ -325,7 +327,7 @@ CREATE TABLE tb_cargos (
   CONSTRAINT pk_cargos PRIMARY KEY (pk_cargo)
 );
 
-CREATE TABLE tb_funcionarios (
+CREATE TABLE IF NOT EXISTS tb_funcionarios (
   pk_fk_cpf           CHAR(11)      NOT NULL,
   matricula_funcional  INT           NOT NULL,
   fk_departamento      INT           NOT NULL,
@@ -336,11 +338,11 @@ CREATE TABLE tb_funcionarios (
   ultima_atualizacao   TIMESTAMP     NOT NULL DEFAULT NOW(),
   CONSTRAINT pk_funcionarios      PRIMARY KEY (pk_fk_cpf),
   CONSTRAINT uq_func_matricula    UNIQUE      (matricula_funcional),
-  CONSTRAINT fk_func_cpf          FOREIGN KEY (pk_fk_cpf)      REFERENCES tb_pessoas(pk_cpf),
+  CONSTRAINT fk_func_cpf          FOREIGN KEY (pk_fk_cpf)       REFERENCES tb_pessoas(pk_cpf),
   CONSTRAINT fk_func_depto        FOREIGN KEY (fk_departamento) REFERENCES tb_departamentos(pk_departamento)
 );
 
-CREATE TABLE tb_historico_cargos (
+CREATE TABLE IF NOT EXISTS tb_historico_cargos (
   pk_hist              INT      NOT NULL AUTO_INCREMENT,
   fk_cpf_funcionario   CHAR(11) NOT NULL,
   fk_cargo             INT      NOT NULL,
@@ -352,15 +354,14 @@ CREATE TABLE tb_historico_cargos (
   CONSTRAINT fk_hc_cargo       FOREIGN KEY (fk_cargo)           REFERENCES tb_cargos(pk_cargo)
 );
 
-CREATE TABLE tb_titulacoes (
+CREATE TABLE IF NOT EXISTS tb_titulacoes (
   pk_titulacao INT         NOT NULL AUTO_INCREMENT,
   nome         VARCHAR(30) NOT NULL,
   CONSTRAINT pk_titulacoes PRIMARY KEY (pk_titulacao),
   CONSTRAINT uq_titulacoes UNIQUE      (nome)
 );
 
-
-CREATE TABLE tb_professores (
+CREATE TABLE IF NOT EXISTS tb_professores (
   pk_fk_cpf    CHAR(11)    NOT NULL,
   area_atuacao VARCHAR(50) NOT NULL,
   fk_titulacao INT         NOT NULL,
@@ -369,15 +370,14 @@ CREATE TABLE tb_professores (
   CONSTRAINT fk_prof_titulacao   FOREIGN KEY (fk_titulacao) REFERENCES tb_titulacoes(pk_titulacao)
 );
 
-CREATE TABLE tb_beneficios (
+CREATE TABLE IF NOT EXISTS tb_beneficios (
   pk_beneficio INT          NOT NULL AUTO_INCREMENT,
   nome         VARCHAR(50)  NOT NULL,
   descricao    VARCHAR(100) NOT NULL,
   CONSTRAINT pk_beneficios PRIMARY KEY (pk_beneficio)
 );
 
-
-CREATE TABLE tb_funcionario_beneficio (
+CREATE TABLE IF NOT EXISTS tb_funcionario_beneficio (
   fk_cpf_funcionario CHAR(11) NOT NULL,
   fk_beneficio       INT      NOT NULL,
   data_inicio        DATE     NOT NULL,
@@ -387,8 +387,7 @@ CREATE TABLE tb_funcionario_beneficio (
   CONSTRAINT fk_fb_beneficio    FOREIGN KEY (fk_beneficio)       REFERENCES tb_beneficios(pk_beneficio)
 );
 
-
-CREATE TABLE tb_folha_pagamento (
+CREATE TABLE IF NOT EXISTS tb_folha_pagamento (
   pk_folha           INT           NOT NULL AUTO_INCREMENT,
   fk_cpf_funcionario CHAR(11)      NOT NULL,
   mes                INT           NOT NULL,
@@ -400,11 +399,12 @@ CREATE TABLE tb_folha_pagamento (
   status             VARCHAR(20)   NOT NULL COMMENT 'pendente, pago',
   CONSTRAINT pk_folha_pagamento PRIMARY KEY (pk_folha),
   CONSTRAINT uq_folha_pagamento UNIQUE      (fk_cpf_funcionario, mes, ano),
+  -- CORREÇÃO: CHECK adicionado conforme dicionário de dados
+  CONSTRAINT ck_folha_mes       CHECK       (mes BETWEEN 1 AND 12),
   CONSTRAINT fk_folha_func      FOREIGN KEY (fk_cpf_funcionario) REFERENCES tb_funcionarios(pk_fk_cpf)
 );
 
-
-CREATE TABLE tb_verbas (
+CREATE TABLE IF NOT EXISTS tb_verbas (
   pk_verba INT         NOT NULL AUTO_INCREMENT,
   nome     VARCHAR(50) NOT NULL,
   tipo     CHAR(1)     NOT NULL COMMENT 'P = provento, D = desconto',
@@ -412,18 +412,16 @@ CREATE TABLE tb_verbas (
   CONSTRAINT uq_verbas UNIQUE      (nome)
 );
 
-
-CREATE TABLE tb_folha_verbas (
+CREATE TABLE IF NOT EXISTS tb_folha_verbas (
   fk_folha INT           NOT NULL,
   fk_verba INT           NOT NULL,
   valor    DECIMAL(10,2) NOT NULL,
-  CONSTRAINT pk_folha_verbas PRIMARY KEY (fk_folha, fk_verba),
+  CONSTRAINT pk_folha_verbas PRIMARY KEY (fk_folha, fk_verba),   -- RN12
   CONSTRAINT fk_fv_folha     FOREIGN KEY (fk_folha) REFERENCES tb_folha_pagamento(pk_folha),
   CONSTRAINT fk_fv_verba     FOREIGN KEY (fk_verba) REFERENCES tb_verbas(pk_verba)
 );
 
-
-CREATE TABLE tb_ferias (
+CREATE TABLE IF NOT EXISTS tb_ferias (
   pk_ferias          INT         NOT NULL AUTO_INCREMENT,
   fk_cpf_funcionario CHAR(11)    NOT NULL,
   data_inicio        DATE        NOT NULL,
@@ -435,13 +433,13 @@ CREATE TABLE tb_ferias (
   CONSTRAINT fk_ferias_func FOREIGN KEY (fk_cpf_funcionario) REFERENCES tb_funcionarios(pk_fk_cpf)
 );
 
-CREATE TABLE tb_tipo_afastamento (
+CREATE TABLE IF NOT EXISTS tb_tipo_afastamento (
   pk_tipo   INT         NOT NULL AUTO_INCREMENT,
   descricao VARCHAR(50) NOT NULL,
   CONSTRAINT pk_tipo_afastamento PRIMARY KEY (pk_tipo)
 );
 
-CREATE TABLE tb_afastamentos (
+CREATE TABLE IF NOT EXISTS tb_afastamentos (
   pk_afastamento     INT          NOT NULL AUTO_INCREMENT,
   fk_cpf_funcionario CHAR(11)     NOT NULL,
   fk_tipo            INT          NOT NULL,
@@ -454,19 +452,21 @@ CREATE TABLE tb_afastamentos (
 );
 
 -- =============================================================================
--- MÓDULO FINANCEIRO
+-- 4. MÓDULO FINANCEIRO
 -- Gerencia contratos educacionais, descontos/bolsas, mensalidades e
--- pagamentos. Integra com o Módulo Acadêmico via RN02, RN04 e RN11.
--- Regras de negócio: RN14 e RN15 (bolsas e inadimplência).
+-- pagamentos. Integra com Acadêmico via RN02, RN04 e RN11.
+-- Regras: RN14 e RN15.
 -- =============================================================================
 
-CREATE TABLE tb_status_pagamento (
+CREATE TABLE IF NOT EXISTS tb_status_pagamento (
   pk_status_pagamento INT         NOT NULL,
   descricao           VARCHAR(20) NOT NULL COMMENT 'Pendente, Pago, Atrasado, Cancelado',
-  CONSTRAINT pk_status_pagamento PRIMARY KEY (pk_status_pagamento)
+  -- CORREÇÃO: UNIQUE adicionado conforme dicionário de dados
+  CONSTRAINT pk_status_pagamento  PRIMARY KEY (pk_status_pagamento),
+  CONSTRAINT uq_status_pagamento  UNIQUE      (descricao)
 );
 
-CREATE TABLE tb_contratos_educacionais (
+CREATE TABLE IF NOT EXISTS tb_contratos_educacionais (
   pk_contrato       INT           NOT NULL AUTO_INCREMENT,
   fk_cpf_aluno      CHAR(11)      NOT NULL,
   data_inicio       DATE          NOT NULL,
@@ -477,8 +477,7 @@ CREATE TABLE tb_contratos_educacionais (
   CONSTRAINT fk_cont_aluno             FOREIGN KEY (fk_cpf_aluno) REFERENCES tb_alunos(pk_fk_cpf)
 );
 
-
-CREATE TABLE tb_descontos_bolsas (
+CREATE TABLE IF NOT EXISTS tb_descontos_bolsas (
   pk_desconto         INT           NOT NULL AUTO_INCREMENT,
   fk_contrato         INT           NOT NULL,
   tipo_bolsa          VARCHAR(50)   NOT NULL COMMENT 'ProUni, FIES, Funcionário, Desempenho',
@@ -487,11 +486,11 @@ CREATE TABLE tb_descontos_bolsas (
   CONSTRAINT pk_descontos_bolsas  PRIMARY KEY (pk_desconto),
   CONSTRAINT fk_desc_contrato     FOREIGN KEY (fk_contrato) REFERENCES tb_contratos_educacionais(pk_contrato),
   CONSTRAINT ck_desconto_nao_nulo CHECK (
-    percentual_desconto IS NOT NULL OR valor_fixo_desconto IS NOT NULL
+    percentual_desconto IS NOT NULL OR valor_fixo_desconto IS NOT NULL  -- RN14
   )
 );
 
-CREATE TABLE tb_mensalidades (
+CREATE TABLE IF NOT EXISTS tb_mensalidades (
   pk_mensalidade  INT           NOT NULL AUTO_INCREMENT,
   fk_contrato     INT           NOT NULL,
   fk_status       INT           NOT NULL,
@@ -504,48 +503,38 @@ CREATE TABLE tb_mensalidades (
   CONSTRAINT fk_mens_status     FOREIGN KEY (fk_status)   REFERENCES tb_status_pagamento(pk_status_pagamento)
 );
 
-CREATE TABLE tb_pagamentos (
+CREATE TABLE IF NOT EXISTS tb_pagamentos (
   pk_pagamento   INT           NOT NULL AUTO_INCREMENT,
   fk_mensalidade INT           NOT NULL,
   valor_pago     DECIMAL(10,2) NOT NULL,
   data_pagamento TIMESTAMP     NOT NULL DEFAULT NOW(),
   meio_pagamento VARCHAR(20)   NOT NULL COMMENT 'Boleto, Pix, Cartão',
-  CONSTRAINT pk_pagamentos          PRIMARY KEY (pk_pagamento),
-  CONSTRAINT fk_pag_mensalidade     FOREIGN KEY (fk_mensalidade) REFERENCES tb_mensalidades(pk_mensalidade)
+  CONSTRAINT pk_pagamentos      PRIMARY KEY (pk_pagamento),
+  CONSTRAINT fk_pag_mensalidade FOREIGN KEY (fk_mensalidade) REFERENCES tb_mensalidades(pk_mensalidade)
 );
 
-
 -- =============================================================================
--- VIEWS — Campos Calculados (3FN)
---
--- Conforme apontado na avaliação:
---   • tb_mensalidades.valor_multa e valor_juros são derivados do status/regras
---     financeiras — expostos via VIEW para consulta sem recálculo na aplicação.
---   • tb_folha_pagamento.salario_bruto, total_descontos e salario_liquido são
---     snapshot do fechamento (RN13), mas a VIEW abaixo permite recalculá-los
---     a partir de tb_folha_verbas para fins de auditoria e consulta.
+-- 5. VIEWS — Campos Calculados (3FN)
+--    Campos derivados expostos via VIEW para não violar 3FN.
 -- =============================================================================
 
--- VIEW: mensalidades com encargos calculados (multa + juros sobre valor_liquido)
--- Regra RN15: ao consultar uma mensalidade atrasada, valor_total já reflete encargos.
+-- VIEW: mensalidades com encargos calculados (RN15)
 CREATE OR REPLACE VIEW vw_mensalidades AS
 SELECT
   m.pk_mensalidade,
   m.fk_contrato,
   m.fk_status,
-  sp.descricao                                             AS status_descricao,
+  sp.descricao                                              AS status_descricao,
   m.data_vencimento,
   m.valor_liquido,
   m.valor_multa,
   m.valor_juros,
-  (m.valor_liquido + m.valor_multa + m.valor_juros)       AS valor_total_com_encargos
+  (m.valor_liquido + m.valor_multa + m.valor_juros)        AS valor_total_com_encargos
 FROM tb_mensalidades m
 INNER JOIN tb_status_pagamento sp
   ON sp.pk_status_pagamento = m.fk_status;
 
 -- VIEW: folha de pagamento recalculada a partir das verbas (auditoria — RN13)
--- Permite verificar se o snapshot gravado na tb_folha_pagamento bate com o
--- somatório real das verbas detalhadas em tb_folha_verbas.
 CREATE OR REPLACE VIEW vw_folha_pagamento AS
 SELECT
   fp.pk_folha,
@@ -563,7 +552,7 @@ SELECT
   COALESCE(SUM(CASE WHEN v.tipo = 'D' THEN fv.valor ELSE 0 END), 0) AS total_descontos_calculado,
   COALESCE(SUM(CASE WHEN v.tipo = 'P' THEN fv.valor ELSE 0 END), 0)
     - COALESCE(SUM(CASE WHEN v.tipo = 'D' THEN fv.valor ELSE 0 END), 0)
-                                                           AS salario_liquido_calculado
+                                                            AS salario_liquido_calculado
 FROM tb_folha_pagamento fp
 LEFT JOIN tb_folha_verbas fv ON fv.fk_folha = fp.pk_folha
 LEFT JOIN tb_verbas v        ON v.pk_verba  = fv.fk_verba
@@ -571,3 +560,133 @@ GROUP BY
   fp.pk_folha, fp.fk_cpf_funcionario, fp.mes, fp.ano,
   fp.status, fp.data_pagamento,
   fp.salario_bruto, fp.total_descontos, fp.salario_liquido;
+
+-- =============================================================================
+-- 6. ÍNDICES — Otimização de Desempenho
+-- =============================================================================
+
+-- BASE / PESSOAS
+CREATE INDEX IF NOT EXISTS idx_end_cpf           ON tb_enderecos  (fk_cpf);
+CREATE INDEX IF NOT EXISTS idx_end_cep           ON tb_enderecos  (fk_cep);
+CREATE INDEX IF NOT EXISTS idx_tel_cpf           ON tb_telefones  (fk_cpf);
+CREATE INDEX IF NOT EXISTS idx_email_cpf         ON tb_emails     (fk_cpf);
+
+-- ACADÊMICO
+CREATE INDEX IF NOT EXISTS idx_curso_tipo        ON tb_cursos     (fk_tipo_curso);
+CREATE INDEX IF NOT EXISTS idx_aluno_status      ON tb_alunos     (fk_status);
+CREATE INDEX IF NOT EXISTS idx_ac_aluno_curso    ON tb_aluno_curso(fk_cpf_aluno, fk_curso);
+CREATE INDEX IF NOT EXISTS idx_ac_curso_aluno    ON tb_aluno_curso(fk_curso, fk_cpf_aluno);
+CREATE INDEX IF NOT EXISTS idx_hsa_aluno_status  ON tb_historico_status_aluno(fk_cpf_aluno, fk_status);
+CREATE INDEX IF NOT EXISTS idx_gc_curso_disc     ON tb_grade_curricular(fk_curso, fk_disciplina);
+CREATE INDEX IF NOT EXISTS idx_pr_disc_req       ON tb_pre_requisitos(fk_disciplina, fk_requisito);
+CREATE INDEX IF NOT EXISTS idx_turma_curso       ON tb_turmas     (fk_curso);
+CREATE INDEX IF NOT EXISTS idx_mat_aluno_periodo ON tb_matriculas (fk_cpf_aluno, fk_periodo);
+CREATE INDEX IF NOT EXISTS idx_mat_disciplina    ON tb_matriculas (fk_disciplina);
+CREATE INDEX IF NOT EXISTS idx_mat_turma         ON tb_matriculas (fk_turma);
+CREATE INDEX IF NOT EXISTS idx_mat_turma_disc    ON tb_matriculas (fk_turma, fk_disciplina);
+CREATE INDEX IF NOT EXISTS idx_res_matricula     ON tb_resultado_matricula(fk_matricula);
+CREATE INDEX IF NOT EXISTS idx_aval_disciplina   ON tb_avaliacoes (fk_disciplina);
+CREATE INDEX IF NOT EXISTS idx_nota_mat_aval     ON tb_notas      (fk_matricula, fk_avaliacao);
+CREATE INDEX IF NOT EXISTS idx_nota_professor    ON tb_notas      (fk_cpf_professor);
+CREATE INDEX IF NOT EXISTS idx_log_nota          ON tb_log_notas  (fk_nota);
+CREATE INDEX IF NOT EXISTS idx_log_professor     ON tb_log_notas  (fk_cpf_professor);
+CREATE INDEX IF NOT EXISTS idx_falta_matricula   ON tb_faltas     (fk_matricula);
+CREATE INDEX IF NOT EXISTS idx_aula_turma_periodo ON tb_aulas     (fk_turma, fk_periodo);
+CREATE INDEX IF NOT EXISTS idx_aula_disciplina   ON tb_aulas      (fk_disciplina);
+CREATE INDEX IF NOT EXISTS idx_aula_professor    ON tb_aulas      (fk_cpf_professor);
+CREATE INDEX IF NOT EXISTS idx_aula_sala         ON tb_aulas      (fk_sala);
+CREATE INDEX IF NOT EXISTS idx_aula_prof_periodo ON tb_aulas      (fk_cpf_professor, fk_periodo);
+
+-- RH
+CREATE INDEX IF NOT EXISTS idx_func_departamento ON tb_funcionarios(fk_departamento);
+CREATE INDEX IF NOT EXISTS idx_hc_func_cargo     ON tb_historico_cargos(fk_cpf_funcionario, fk_cargo);
+CREATE INDEX IF NOT EXISTS idx_prof_titulacao    ON tb_professores(fk_titulacao);
+CREATE INDEX IF NOT EXISTS idx_fb_func_benef     ON tb_funcionario_beneficio(fk_cpf_funcionario, fk_beneficio);
+CREATE INDEX IF NOT EXISTS idx_folha_funcionario ON tb_folha_pagamento(fk_cpf_funcionario);
+CREATE INDEX IF NOT EXISTS idx_fv_folha_verba    ON tb_folha_verbas(fk_folha, fk_verba);
+CREATE INDEX IF NOT EXISTS idx_ferias_func       ON tb_ferias     (fk_cpf_funcionario);
+CREATE INDEX IF NOT EXISTS idx_afas_func_tipo    ON tb_afastamentos(fk_cpf_funcionario, fk_tipo);
+
+-- FINANCEIRO
+CREATE INDEX IF NOT EXISTS idx_cont_aluno           ON tb_contratos_educacionais(fk_cpf_aluno);
+CREATE INDEX IF NOT EXISTS idx_desc_contrato         ON tb_descontos_bolsas(fk_contrato);
+CREATE INDEX IF NOT EXISTS idx_mens_contrato_status  ON tb_mensalidades(fk_contrato, fk_status);
+CREATE INDEX IF NOT EXISTS idx_pag_mensalidade_data  ON tb_pagamentos(fk_mensalidade, data_pagamento);
+
+-- =============================================================================
+-- 7. CONSULTAS DE VALIDAÇÃO — JOIN GERAL (bugfixes aplicados)
+-- =============================================================================
+
+-- ----------------------------------------
+-- ACADÊMICO: alunos, cursos, notas
+-- ----------------------------------------
+SELECT
+  pe.pk_cpf,
+  pe.primeiro_nome,
+  pe.sobrenome,
+  cu.nome        AS curso,
+  d.nome         AS disciplina,
+  m.pk_matricula,
+  n.valor_nota,
+  av.descricao   AS avaliacao
+FROM tb_pessoas pe
+INNER JOIN tb_alunos a
+  ON a.pk_fk_cpf = pe.pk_cpf
+INNER JOIN tb_aluno_curso ac
+  ON ac.fk_cpf_aluno = a.pk_fk_cpf
+INNER JOIN tb_cursos cu
+  ON cu.pk_curso = ac.fk_curso
+INNER JOIN tb_matriculas m
+  ON m.fk_cpf_aluno = a.pk_fk_cpf
+INNER JOIN tb_disciplinas d
+  ON d.pk_disciplina = m.fk_disciplina
+LEFT JOIN tb_notas n
+  ON n.fk_matricula = m.pk_matricula
+LEFT JOIN tb_avaliacoes av
+  ON av.pk_avaliacao = n.fk_avaliacao;
+
+-- ----------------------------------------
+-- RH: funcionários, departamentos, cargos
+-- ----------------------------------------
+SELECT
+  p.pk_cpf,
+  p.primeiro_nome,
+  p.sobrenome,
+  f.pk_fk_cpf   AS funcionario,
+  dep.nome      AS departamento,
+  c.nome        AS cargo
+FROM tb_funcionarios f
+INNER JOIN tb_pessoas p
+  ON p.pk_cpf = f.pk_fk_cpf
+LEFT JOIN tb_departamentos dep
+  ON dep.pk_departamento = f.fk_departamento
+LEFT JOIN tb_historico_cargos hc
+  ON hc.fk_cpf_funcionario = f.pk_fk_cpf
+  AND hc.data_fim IS NULL        -- cargo atual
+LEFT JOIN tb_cargos c
+  ON c.pk_cargo = hc.fk_cargo;
+
+-- ----------------------------------------
+-- FINANCEIRO: alunos, contratos, mensalidades, pagamentos, status
+-- CORREÇÃO: me.valor → me.valor_liquido | JOIN de status via tb_mensalidades
+-- ----------------------------------------
+SELECT
+  pe.pk_cpf,
+  pe.primeiro_nome,
+  pe.sobrenome,
+  c.pk_contrato,
+  me.pk_mensalidade,
+  me.valor_liquido,                       -- CORRIGIDO: era me.valor (coluna inexistente)
+  pa.valor_pago,
+  sp.descricao   AS status_pagamento      -- CORRIGIDO: JOIN via tb_mensalidades, não tb_pagamentos
+FROM tb_pessoas pe
+INNER JOIN tb_alunos a
+  ON a.pk_fk_cpf = pe.pk_cpf
+INNER JOIN tb_contratos_educacionais c
+  ON c.fk_cpf_aluno = a.pk_fk_cpf
+INNER JOIN tb_mensalidades me
+  ON me.fk_contrato = c.pk_contrato
+LEFT JOIN tb_status_pagamento sp
+  ON sp.pk_status_pagamento = me.fk_status   -- CORRIGIDO: era ON sp.pk_status_pagamento = pa.fk_status
+LEFT JOIN tb_pagamentos pa
+  ON pa.fk_mensalidade = me.pk_mensalidade;
