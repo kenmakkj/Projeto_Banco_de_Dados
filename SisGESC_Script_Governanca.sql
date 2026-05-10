@@ -302,11 +302,11 @@ CREATE TABLE IF NOT EXISTS tb_schema_version (
 
 INSERT IGNORE INTO tb_schema_version (versao, descricao, script, aplicado_por) VALUES
 ('6.0.0',
-<<<<<<< HEAD
+
  'Fase 6 — Governança: EXPLAIN antes/depois índices, run_all.sql, versionamento',
  'SisGESC_Script_Governanca.sql',
-=======
+
  'Fase 6 — Governança: EXPLAIN antes/depois índices, reset, run_all, versionamento',
  'SisGESC_Script_Governanca_corrigido.sql',
->>>>>>> 24d4a75c507c4d78d906313fc99809df8bd6b6e8
+
  'equipe_sisgesc');
