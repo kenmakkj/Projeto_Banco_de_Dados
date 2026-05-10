@@ -5,21 +5,6 @@
 
 USE sisgesc;
 
--- =============================================================================
-<<<<<<< HEAD
--- NOTA — RESET COMPLETO (DROP/TRUNCATE)
--- O reset que remove todas as tabelas está apenas em run_all.sql (PASSO 1).
--- Este ficheiro NÃO apaga dados, para poder ser executado após DML/OLAP
--- sem destruir o ambiente antes da validação OLTP × OLAP.
--- =============================================================================
-
--- =============================================================================
--- SEÇÃO I — PERFORMANCE E GOVERNANÇA (FASE 5)
-=======
--- SEÇÃO I — SCRIPT DE RESET
--- Remove todos os objetos em ordem segura (dependentes primeiro).
--- =============================================================================
-
 SET FOREIGN_KEY_CHECKS = 0;
 
 DROP TABLE IF EXISTS tb_pagamentos;
