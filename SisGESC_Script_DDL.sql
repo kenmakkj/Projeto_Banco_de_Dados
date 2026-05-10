@@ -1,15 +1,9 @@
--- =============================================================================
 -- SisGESC — Script DDL (MySQL 8+)
 -- Sistema de Gestão Escolar — Universidade Privada
 -- Modelagem relacional em 3FN (Terceira Forma Normal)
 -- Versão: CORRIGIDA
---
-<<<<<<< HEAD
 -- NOTA (governança): a instalação oficial usa apenas SisGESC_Script_DDL_otimizado.sql
 -- via run_all.sql. Não execute os dois DDL completos no mesmo schema.
---
-=======
->>>>>>> 24d4a75c507c4d78d906313fc99809df8bd6b6e8
 -- Módulos:
 --   1. Base / Pessoas
 --   2. Módulo Acadêmico
@@ -18,7 +12,6 @@
 --   5. Views
 --   6. Índices
 --   7. Consultas de validação
--- =============================================================================
 
 CREATE DATABASE IF NOT EXISTS sisgesc
   CHARACTER SET utf8mb4
@@ -26,9 +19,6 @@ CREATE DATABASE IF NOT EXISTS sisgesc
 
 USE sisgesc;
 
--- =============================================================================
--- 1. BASE / PESSOAS
--- =============================================================================
 
 CREATE TABLE IF NOT EXISTS tb_pessoas (
   pk_cpf             CHAR(11)     NOT NULL,
@@ -85,9 +75,6 @@ CREATE TABLE IF NOT EXISTS tb_emails (
   CONSTRAINT fk_email_cpf FOREIGN KEY (fk_cpf) REFERENCES tb_pessoas(pk_cpf)
 );
 
--- =============================================================================
--- 2. MÓDULO ACADÊMICO
--- =============================================================================
 
 CREATE TABLE IF NOT EXISTS tb_tipo_curso (
   pk_tipo_curso INT         NOT NULL AUTO_INCREMENT,
@@ -247,9 +234,6 @@ CREATE TABLE IF NOT EXISTS tb_salas (
   CONSTRAINT pk_salas PRIMARY KEY (pk_sala)
 );
 
--- =============================================================================
--- 3. MÓDULO RH
--- =============================================================================
 
 CREATE TABLE IF NOT EXISTS tb_departamentos (
   pk_departamento    INT         NOT NULL AUTO_INCREMENT,
@@ -473,9 +457,6 @@ CREATE TABLE IF NOT EXISTS tb_afastamentos (
   CONSTRAINT fk_afas_tipo    FOREIGN KEY (fk_tipo)            REFERENCES tb_tipo_afastamento(pk_tipo)
 );
 
--- =============================================================================
--- 4. MÓDULO FINANCEIRO
--- =============================================================================
 
 CREATE TABLE IF NOT EXISTS tb_status_pagamento (
   pk_status_pagamento INT         NOT NULL,
@@ -544,9 +525,7 @@ CREATE TABLE IF NOT EXISTS tb_pagamentos (
   CONSTRAINT fk_pag_mensalidade FOREIGN KEY (fk_mensalidade) REFERENCES tb_mensalidades(pk_mensalidade)
 );
 
--- =============================================================================
 -- 5. VIEWS — Campos Calculados (3FN)
--- =============================================================================
 
 -- VIEW: mensalidades com encargos calculados (RN15)
 CREATE OR REPLACE VIEW vw_mensalidades AS
@@ -588,17 +567,13 @@ GROUP BY
   fp.status, fp.data_pagamento,
   fp.salario_bruto, fp.total_descontos, fp.salario_liquido;
 
--- =============================================================================
 -- 6. ÍNDICES — Otimização de Desempenho
--- =============================================================================
 
--- BASE / PESSOAS
 CREATE INDEX IF NOT EXISTS idx_end_cpf              ON tb_enderecos  (fk_cpf);
 CREATE INDEX IF NOT EXISTS idx_end_cep              ON tb_enderecos  (fk_cep);
 CREATE INDEX IF NOT EXISTS idx_tel_cpf              ON tb_telefones  (fk_cpf);
 CREATE INDEX IF NOT EXISTS idx_email_cpf            ON tb_emails     (fk_cpf);
 
--- ACADÊMICO
 CREATE INDEX IF NOT EXISTS idx_curso_tipo           ON tb_cursos     (fk_tipo_curso);
 CREATE INDEX IF NOT EXISTS idx_aluno_status         ON tb_alunos     (fk_status);
 CREATE INDEX IF NOT EXISTS idx_ac_aluno_curso       ON tb_aluno_curso(fk_cpf_aluno, fk_curso);
@@ -624,7 +599,6 @@ CREATE INDEX IF NOT EXISTS idx_aula_professor       ON tb_aulas      (fk_cpf_pro
 CREATE INDEX IF NOT EXISTS idx_aula_sala            ON tb_aulas      (fk_sala);
 CREATE INDEX IF NOT EXISTS idx_aula_prof_periodo    ON tb_aulas      (fk_cpf_professor, fk_periodo);
 
--- RH
 CREATE INDEX IF NOT EXISTS idx_func_departamento    ON tb_funcionarios(fk_departamento);
 CREATE INDEX IF NOT EXISTS idx_hc_func_cargo        ON tb_historico_cargos(fk_cpf_funcionario, fk_cargo);
 CREATE INDEX IF NOT EXISTS idx_prof_titulacao       ON tb_professores(fk_titulacao);
@@ -636,18 +610,14 @@ CREATE INDEX IF NOT EXISTS idx_fv_folha_verba       ON tb_folha_verbas(fk_folha,
 CREATE INDEX IF NOT EXISTS idx_ferias_func          ON tb_ferias     (fk_cpf_funcionario);
 CREATE INDEX IF NOT EXISTS idx_afas_func_tipo       ON tb_afastamentos(fk_cpf_funcionario, fk_tipo);
 
--- FINANCEIRO
 CREATE INDEX IF NOT EXISTS idx_cont_aluno              ON tb_contratos_educacionais(fk_cpf_aluno);
 CREATE INDEX IF NOT EXISTS idx_cd_contrato             ON tb_contrato_desconto(fk_contrato);
 CREATE INDEX IF NOT EXISTS idx_cd_desconto             ON tb_contrato_desconto(fk_desconto);
 CREATE INDEX IF NOT EXISTS idx_mens_contrato_status    ON tb_mensalidades(fk_contrato, fk_status);
 CREATE INDEX IF NOT EXISTS idx_pag_mensalidade_data    ON tb_pagamentos(fk_mensalidade, data_pagamento);
 
--- =============================================================================
 -- 7. CONSULTAS DE VALIDAÇÃO — JOIN GERAL (bugfixes aplicados)
--- =============================================================================
 
--- ACADÊMICO
 SELECT
   pe.pk_cpf,
   pe.primeiro_nome,
