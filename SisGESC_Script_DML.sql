@@ -2,18 +2,6 @@
 -- SisGESC — Script DML (MySQL) — VERSÃO CORRIGIDA
 -- Sistema de Gestão Escolar — Universidade Privada
 --
--- CORREÇÕES APLICADAS:
---   [1] PROVA DE IDEMPOTÊNCIA FASE 2: SELECT COUNT(*) em TODAS as tabelas
---       executado ANTES e DEPOIS da carga, com resultados explícitos esperados.
---       O bloco de validação foi DESCOMENTADO e expandido para cobrir TODAS
-<<<<<<< HEAD
---       as tabelas de dados do schema sisgesc (antes era incompleto).
-=======
---       as 35+ tabelas do schema (antes era comentado e incompleto).
->>>>>>> 24d4a75c507c4d78d906313fc99809df8bd6b6e8
---   [2] INSERT IGNORE mantido em todos os registros (garante idempotência).
--- =============================================================================
-
 USE sisgesc;
 
 -- =============================================================================
@@ -526,14 +514,14 @@ INSERT IGNORE INTO tb_contrato_desconto (fk_contrato, fk_desconto, percentual_de
 (6, 3, 100.00, NULL, '2022-02-01', '2024-12-31'),
 (8, 4, 20.00,  NULL, '2024-02-01', NULL),
 (1, 1, NULL,   100.00, '2023-02-01', NULL);
-=======
+
 INSERT IGNORE INTO tb_descontos_bolsas (fk_contrato, tipo_bolsa, percentual_desconto, valor_fixo_desconto) VALUES
 (3, 'Desempenho',    15.00, NULL),
 (5, 'FIES',          50.00, NULL),
 (6, 'ProUni',       100.00, NULL),
 (8, 'Funcionário',   20.00, NULL),
 (1, 'Desempenho',    NULL,  100.00);
->>>>>>> 24d4a75c507c4d78d906313fc99809df8bd6b6e8
+
 
 INSERT IGNORE INTO tb_mensalidades (pk_mensalidade, fk_contrato, fk_status, data_vencimento, valor_liquido, valor_multa, valor_juros) VALUES
 (1,  1, 2, '2025-01-10', 1100.00, 0.00,  0.00),
@@ -662,17 +650,14 @@ SELECT 'tb_faltas',                             COUNT(*)          FROM tb_faltas
 SELECT 'tb_departamentos',                      COUNT(*)          FROM tb_departamentos          UNION ALL
 SELECT 'tb_cargos',                             COUNT(*)          FROM tb_cargos                 UNION ALL
 SELECT 'tb_titulacoes',                         COUNT(*)          FROM tb_titulacoes             UNION ALL
-<<<<<<< HEAD
 SELECT 'tb_areas_atuacao',                      COUNT(*)          FROM tb_areas_atuacao          UNION ALL
 SELECT 'tb_funcionarios',                       COUNT(*)          FROM tb_funcionarios           UNION ALL
 SELECT 'tb_historico_cargos',                   COUNT(*)          FROM tb_historico_cargos       UNION ALL
 SELECT 'tb_professores',                        COUNT(*)          FROM tb_professores            UNION ALL
 SELECT 'tb_professor_area',                     COUNT(*)          FROM tb_professor_area          UNION ALL
-=======
 SELECT 'tb_funcionarios',                       COUNT(*)          FROM tb_funcionarios           UNION ALL
 SELECT 'tb_historico_cargos',                   COUNT(*)          FROM tb_historico_cargos       UNION ALL
 SELECT 'tb_professores',                        COUNT(*)          FROM tb_professores            UNION ALL
->>>>>>> 24d4a75c507c4d78d906313fc99809df8bd6b6e8
 SELECT 'tb_beneficios',                         COUNT(*)          FROM tb_beneficios             UNION ALL
 SELECT 'tb_funcionario_beneficio',              COUNT(*)          FROM tb_funcionario_beneficio  UNION ALL
 SELECT 'tb_verbas',                             COUNT(*)          FROM tb_verbas                 UNION ALL
@@ -684,10 +669,7 @@ SELECT 'tb_afastamentos',                       COUNT(*)          FROM tb_afasta
 SELECT 'tb_status_pagamento',                   COUNT(*)          FROM tb_status_pagamento       UNION ALL
 SELECT 'tb_contratos_educacionais',             COUNT(*)          FROM tb_contratos_educacionais UNION ALL
 SELECT 'tb_descontos_bolsas',                   COUNT(*)          FROM tb_descontos_bolsas       UNION ALL
-<<<<<<< HEAD
 SELECT 'tb_contrato_desconto',                  COUNT(*)          FROM tb_contrato_desconto      UNION ALL
-=======
->>>>>>> 24d4a75c507c4d78d906313fc99809df8bd6b6e8
 SELECT 'tb_mensalidades',                       COUNT(*)          FROM tb_mensalidades           UNION ALL
 SELECT 'tb_pagamentos',                         COUNT(*)          FROM tb_pagamentos;
 
