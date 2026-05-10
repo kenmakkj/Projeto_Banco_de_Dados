@@ -6,6 +6,7 @@
 USE sisgesc;
 
 -- =============================================================================
+<<<<<<< HEAD
 -- NOTA — RESET COMPLETO (DROP/TRUNCATE)
 -- O reset que remove todas as tabelas está apenas em run_all.sql (PASSO 1).
 -- Este ficheiro NÃO apaga dados, para poder ser executado após DML/OLAP
@@ -14,6 +15,65 @@ USE sisgesc;
 
 -- =============================================================================
 -- SEÇÃO I — PERFORMANCE E GOVERNANÇA (FASE 5)
+=======
+-- SEÇÃO I — SCRIPT DE RESET
+-- Remove todos os objetos em ordem segura (dependentes primeiro).
+-- =============================================================================
+
+SET FOREIGN_KEY_CHECKS = 0;
+
+DROP TABLE IF EXISTS tb_pagamentos;
+DROP TABLE IF EXISTS tb_mensalidades;
+DROP TABLE IF EXISTS tb_descontos_bolsas;
+DROP TABLE IF EXISTS tb_contratos_educacionais;
+DROP TABLE IF EXISTS tb_status_pagamento;
+DROP TABLE IF EXISTS tb_afastamentos;
+DROP TABLE IF EXISTS tb_tipo_afastamento;
+DROP TABLE IF EXISTS tb_ferias;
+DROP TABLE IF EXISTS tb_folha_verbas;
+DROP TABLE IF EXISTS tb_verbas;
+DROP TABLE IF EXISTS tb_folha_pagamento;
+DROP TABLE IF EXISTS tb_funcionario_beneficio;
+DROP TABLE IF EXISTS tb_beneficios;
+DROP TABLE IF EXISTS tb_professores;
+DROP TABLE IF EXISTS tb_titulacoes;
+DROP TABLE IF EXISTS tb_historico_cargos;
+DROP TABLE IF EXISTS tb_funcionarios;
+DROP TABLE IF EXISTS tb_cargos;
+DROP TABLE IF EXISTS tb_departamentos;
+DROP TABLE IF EXISTS tb_faltas;
+DROP TABLE IF EXISTS tb_notas;
+DROP TABLE IF EXISTS tb_log_notas;
+DROP TABLE IF EXISTS tb_avaliacoes;
+DROP TABLE IF EXISTS tb_resultado_matricula;
+DROP TABLE IF EXISTS tb_matriculas;
+DROP TABLE IF EXISTS tb_aulas;
+DROP TABLE IF EXISTS tb_salas;
+DROP TABLE IF EXISTS tb_turmas;
+DROP TABLE IF EXISTS tb_periodos;
+DROP TABLE IF EXISTS tb_pre_requisitos;
+DROP TABLE IF EXISTS tb_grade_curricular;
+DROP TABLE IF EXISTS tb_disciplinas;
+DROP TABLE IF EXISTS tb_historico_status_aluno;
+DROP TABLE IF EXISTS tb_aluno_curso;
+DROP TABLE IF EXISTS tb_alunos;
+DROP TABLE IF EXISTS tb_status_aluno;
+DROP TABLE IF EXISTS tb_cursos;
+DROP TABLE IF EXISTS tb_tipo_curso;
+DROP TABLE IF EXISTS tb_emails;
+DROP TABLE IF EXISTS tb_telefones;
+DROP TABLE IF EXISTS tb_enderecos;
+DROP TABLE IF EXISTS tb_cep;
+DROP TABLE IF EXISTS tb_pessoas;
+DROP TABLE IF EXISTS tb_schema_version;
+DROP VIEW  IF EXISTS vw_mensalidades;
+DROP VIEW  IF EXISTS vw_folha_pagamento;
+
+SET FOREIGN_KEY_CHECKS = 1;
+
+-- =============================================================================
+-- SEÇÃO II — PERFORMANCE E GOVERNANÇA (FASE 5)
+>>>>>>> 24d4a75c507c4d78d906313fc99809df8bd6b6e8
 -- ══════════════════════════════════════════════════════════════════════════════
 -- OBJETIVO: demonstrar o impacto dos índices usando EXPLAIN antes e depois.
 -- CONSULTA DE REFERÊNCIA: boletim completo de um aluno (JOIN pesado por CPF).
@@ -258,7 +318,11 @@ SELECT '=== FASE C CONCLUÍDA ===' AS fase;
 */
 
 -- =============================================================================
+<<<<<<< HEAD
 -- SEÇÃO II — CONTROLE DE VERSÃO DO SCHEMA
+=======
+-- SEÇÃO III — CONTROLE DE VERSÃO DO SCHEMA
+>>>>>>> 24d4a75c507c4d78d906313fc99809df8bd6b6e8
 -- =============================================================================
 
 CREATE TABLE IF NOT EXISTS tb_schema_version (
@@ -275,6 +339,11 @@ CREATE TABLE IF NOT EXISTS tb_schema_version (
 
 INSERT IGNORE INTO tb_schema_version (versao, descricao, script, aplicado_por) VALUES
 ('6.0.0',
+<<<<<<< HEAD
  'Fase 6 — Governança: EXPLAIN antes/depois índices, run_all.sql, versionamento',
  'SisGESC_Script_Governanca.sql',
+=======
+ 'Fase 6 — Governança: EXPLAIN antes/depois índices, reset, run_all, versionamento',
+ 'SisGESC_Script_Governanca_corrigido.sql',
+>>>>>>> 24d4a75c507c4d78d906313fc99809df8bd6b6e8
  'equipe_sisgesc');

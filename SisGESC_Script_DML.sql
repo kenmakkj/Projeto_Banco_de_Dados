@@ -6,7 +6,11 @@
 --   [1] PROVA DE IDEMPOTÊNCIA FASE 2: SELECT COUNT(*) em TODAS as tabelas
 --       executado ANTES e DEPOIS da carga, com resultados explícitos esperados.
 --       O bloco de validação foi DESCOMENTADO e expandido para cobrir TODAS
+<<<<<<< HEAD
 --       as tabelas de dados do schema sisgesc (antes era incompleto).
+=======
+--       as 35+ tabelas do schema (antes era comentado e incompleto).
+>>>>>>> 24d4a75c507c4d78d906313fc99809df8bd6b6e8
 --   [2] INSERT IGNORE mantido em todos os registros (garante idempotência).
 -- =============================================================================
 
@@ -48,11 +52,17 @@ SELECT 'tb_faltas',                             COUNT(*)          FROM tb_faltas
 SELECT 'tb_departamentos',                      COUNT(*)          FROM tb_departamentos          UNION ALL
 SELECT 'tb_cargos',                             COUNT(*)          FROM tb_cargos                 UNION ALL
 SELECT 'tb_titulacoes',                         COUNT(*)          FROM tb_titulacoes             UNION ALL
+<<<<<<< HEAD
 SELECT 'tb_areas_atuacao',                      COUNT(*)          FROM tb_areas_atuacao          UNION ALL
 SELECT 'tb_funcionarios',                       COUNT(*)          FROM tb_funcionarios           UNION ALL
 SELECT 'tb_historico_cargos',                   COUNT(*)          FROM tb_historico_cargos       UNION ALL
 SELECT 'tb_professores',                        COUNT(*)          FROM tb_professores            UNION ALL
 SELECT 'tb_professor_area',                     COUNT(*)          FROM tb_professor_area          UNION ALL
+=======
+SELECT 'tb_funcionarios',                       COUNT(*)          FROM tb_funcionarios           UNION ALL
+SELECT 'tb_historico_cargos',                   COUNT(*)          FROM tb_historico_cargos       UNION ALL
+SELECT 'tb_professores',                        COUNT(*)          FROM tb_professores            UNION ALL
+>>>>>>> 24d4a75c507c4d78d906313fc99809df8bd6b6e8
 SELECT 'tb_beneficios',                         COUNT(*)          FROM tb_beneficios             UNION ALL
 SELECT 'tb_funcionario_beneficio',              COUNT(*)          FROM tb_funcionario_beneficio  UNION ALL
 SELECT 'tb_verbas',                             COUNT(*)          FROM tb_verbas                 UNION ALL
@@ -64,7 +74,10 @@ SELECT 'tb_afastamentos',                       COUNT(*)          FROM tb_afasta
 SELECT 'tb_status_pagamento',                   COUNT(*)          FROM tb_status_pagamento       UNION ALL
 SELECT 'tb_contratos_educacionais',             COUNT(*)          FROM tb_contratos_educacionais UNION ALL
 SELECT 'tb_descontos_bolsas',                   COUNT(*)          FROM tb_descontos_bolsas       UNION ALL
+<<<<<<< HEAD
 SELECT 'tb_contrato_desconto',                  COUNT(*)          FROM tb_contrato_desconto      UNION ALL
+=======
+>>>>>>> 24d4a75c507c4d78d906313fc99809df8bd6b6e8
 SELECT 'tb_mensalidades',                       COUNT(*)          FROM tb_mensalidades           UNION ALL
 SELECT 'tb_pagamentos',                         COUNT(*)          FROM tb_pagamentos;
 
@@ -283,6 +296,7 @@ INSERT IGNORE INTO tb_titulacoes (pk_titulacao, nome) VALUES
 (2, 'Mestre'),
 (3, 'Doutor');
 
+<<<<<<< HEAD
 INSERT IGNORE INTO tb_areas_atuacao (pk_area, nome) VALUES
 (1, 'Banco de Dados'),
 (2, 'Engenharia de Software'),
@@ -291,6 +305,8 @@ INSERT IGNORE INTO tb_areas_atuacao (pk_area, nome) VALUES
 (5, 'Gestão de RH'),
 (6, 'Tecnologia da Informação');
 
+=======
+>>>>>>> 24d4a75c507c4d78d906313fc99809df8bd6b6e8
 INSERT IGNORE INTO tb_funcionarios (pk_fk_cpf, matricula_funcional, fk_departamento, data_admissao, salario_base) VALUES
 ('99900011122', 200001, 1, '2015-03-01', 6500.00),
 ('10011122233', 200002, 1, '2018-07-01', 5800.00),
@@ -311,6 +327,7 @@ INSERT IGNORE INTO tb_historico_cargos (fk_cpf_funcionario, fk_cargo, data_inici
 ('55566677799', 3, '2017-09-01', '2022-06-30'),
 ('55566677799', 5, '2022-07-01', NULL);
 
+<<<<<<< HEAD
 INSERT IGNORE INTO tb_professores (pk_fk_cpf, fk_titulacao) VALUES
 ('99900011122', 3),
 ('10011122233', 2),
@@ -324,6 +341,13 @@ INSERT IGNORE INTO tb_professor_area (fk_cpf_professor, fk_area) VALUES
 ('11122233355', 3),
 ('11122233355', 6),
 ('22233344466', 4);
+=======
+INSERT IGNORE INTO tb_professores (pk_fk_cpf, area_atuacao, fk_titulacao) VALUES
+('99900011122', 'Banco de Dados',          3),
+('10011122233', 'Engenharia de Software',  2),
+('11122233355', 'Ciência da Computação',   3),
+('22233344466', 'Administração',           1);
+>>>>>>> 24d4a75c507c4d78d906313fc99809df8bd6b6e8
 
 INSERT IGNORE INTO tb_beneficios (pk_beneficio, nome, descricao) VALUES
 (1, 'Plano de Saúde',    'Cobertura médica e hospitalar'),
@@ -489,6 +513,7 @@ INSERT IGNORE INTO tb_contratos_educacionais (pk_contrato, fk_cpf_aluno, data_in
 (7, '77788899900', '2023-08-01', '2025-07-31', 15600.00, TRUE),
 (8, '88899900011', '2024-02-01', '2026-12-31', 12000.00, TRUE);
 
+<<<<<<< HEAD
 INSERT IGNORE INTO tb_descontos_bolsas (pk_desconto, tipo_bolsa, descricao) VALUES
 (1, 'Desempenho',  'Bolsa por desempenho acadêmico'),
 (2, 'FIES',        'Financiamento estudantil FIES'),
@@ -501,6 +526,14 @@ INSERT IGNORE INTO tb_contrato_desconto (fk_contrato, fk_desconto, percentual_de
 (6, 3, 100.00, NULL, '2022-02-01', '2024-12-31'),
 (8, 4, 20.00,  NULL, '2024-02-01', NULL),
 (1, 1, NULL,   100.00, '2023-02-01', NULL);
+=======
+INSERT IGNORE INTO tb_descontos_bolsas (fk_contrato, tipo_bolsa, percentual_desconto, valor_fixo_desconto) VALUES
+(3, 'Desempenho',    15.00, NULL),
+(5, 'FIES',          50.00, NULL),
+(6, 'ProUni',       100.00, NULL),
+(8, 'Funcionário',   20.00, NULL),
+(1, 'Desempenho',    NULL,  100.00);
+>>>>>>> 24d4a75c507c4d78d906313fc99809df8bd6b6e8
 
 INSERT IGNORE INTO tb_mensalidades (pk_mensalidade, fk_contrato, fk_status, data_vencimento, valor_liquido, valor_multa, valor_juros) VALUES
 (1,  1, 2, '2025-01-10', 1100.00, 0.00,  0.00),
@@ -568,11 +601,17 @@ SELECT '=== CARGA CONCLUÍDA ===' AS etapa;
 --   tb_departamentos         =  4
 --   tb_cargos                =  5
 --   tb_titulacoes            =  3
+<<<<<<< HEAD
 --   tb_areas_atuacao         =  6
 --   tb_funcionarios          =  7
 --   tb_historico_cargos      =  9
 --   tb_professores           =  4
 --   tb_professor_area        =  6
+=======
+--   tb_funcionarios          =  7
+--   tb_historico_cargos      =  9
+--   tb_professores           =  4
+>>>>>>> 24d4a75c507c4d78d906313fc99809df8bd6b6e8
 --   tb_beneficios            =  4
 --   tb_funcionario_beneficio = 16
 --   tb_verbas                =  6
@@ -583,8 +622,12 @@ SELECT '=== CARGA CONCLUÍDA ===' AS etapa;
 --   tb_afastamentos          =  2
 --   tb_status_pagamento      =  4
 --   tb_contratos_educacionais=  8
+<<<<<<< HEAD
 --   tb_descontos_bolsas      =  4
 --   tb_contrato_desconto     =  5
+=======
+--   tb_descontos_bolsas      =  5
+>>>>>>> 24d4a75c507c4d78d906313fc99809df8bd6b6e8
 --   tb_mensalidades          = 15
 --   tb_pagamentos            = 10
 -- ██████████████████████████████████████████████████████████████████████████
@@ -619,11 +662,17 @@ SELECT 'tb_faltas',                             COUNT(*)          FROM tb_faltas
 SELECT 'tb_departamentos',                      COUNT(*)          FROM tb_departamentos          UNION ALL
 SELECT 'tb_cargos',                             COUNT(*)          FROM tb_cargos                 UNION ALL
 SELECT 'tb_titulacoes',                         COUNT(*)          FROM tb_titulacoes             UNION ALL
+<<<<<<< HEAD
 SELECT 'tb_areas_atuacao',                      COUNT(*)          FROM tb_areas_atuacao          UNION ALL
 SELECT 'tb_funcionarios',                       COUNT(*)          FROM tb_funcionarios           UNION ALL
 SELECT 'tb_historico_cargos',                   COUNT(*)          FROM tb_historico_cargos       UNION ALL
 SELECT 'tb_professores',                        COUNT(*)          FROM tb_professores            UNION ALL
 SELECT 'tb_professor_area',                     COUNT(*)          FROM tb_professor_area          UNION ALL
+=======
+SELECT 'tb_funcionarios',                       COUNT(*)          FROM tb_funcionarios           UNION ALL
+SELECT 'tb_historico_cargos',                   COUNT(*)          FROM tb_historico_cargos       UNION ALL
+SELECT 'tb_professores',                        COUNT(*)          FROM tb_professores            UNION ALL
+>>>>>>> 24d4a75c507c4d78d906313fc99809df8bd6b6e8
 SELECT 'tb_beneficios',                         COUNT(*)          FROM tb_beneficios             UNION ALL
 SELECT 'tb_funcionario_beneficio',              COUNT(*)          FROM tb_funcionario_beneficio  UNION ALL
 SELECT 'tb_verbas',                             COUNT(*)          FROM tb_verbas                 UNION ALL
@@ -635,7 +684,10 @@ SELECT 'tb_afastamentos',                       COUNT(*)          FROM tb_afasta
 SELECT 'tb_status_pagamento',                   COUNT(*)          FROM tb_status_pagamento       UNION ALL
 SELECT 'tb_contratos_educacionais',             COUNT(*)          FROM tb_contratos_educacionais UNION ALL
 SELECT 'tb_descontos_bolsas',                   COUNT(*)          FROM tb_descontos_bolsas       UNION ALL
+<<<<<<< HEAD
 SELECT 'tb_contrato_desconto',                  COUNT(*)          FROM tb_contrato_desconto      UNION ALL
+=======
+>>>>>>> 24d4a75c507c4d78d906313fc99809df8bd6b6e8
 SELECT 'tb_mensalidades',                       COUNT(*)          FROM tb_mensalidades           UNION ALL
 SELECT 'tb_pagamentos',                         COUNT(*)          FROM tb_pagamentos;
 

@@ -1,0 +1,145 @@
+-- =============================================================================
+-- SisGESC — run_all.sql
+-- Script único de orquestração — executa TODO o projeto na ordem correta.
+-- Sistema de Gestão Escolar — Universidade Privada
+--
+-- COMO USAR:
+--   Linha de comando:
+--     mysql -u <usuario> -p < run_all.sql
+--
+--   MySQL Workbench / DBeaver:
+--     Abra este arquivo e execute como script.
+--
+-- ORDEM DE EXECUÇÃO:
+--   1. Reset (DROP de todos os objetos existentes)
+--   2. DDL   (criação das tabelas OLTP — sisgesc)
+--   3. DML   (carga de dados operacionais + prova de idempotência)
+--   4. OLTP  (stored procedures + EXPLAIN de performance)
+--   5. OLAP  (criação do Data Warehouse dw_sisgesc + ETL)
+-- =============================================================================
+
+SELECT '╔══════════════════════════════════════════════╗' AS log;
+SELECT '║   SisGESC — INSTALAÇÃO COMPLETA INICIADA     ║' AS log;
+SELECT '╚══════════════════════════════════════════════╝' AS log;
+SELECT NOW() AS inicio_execucao;
+
+-- =============================================================================
+-- PASSO 1 — RESET (DROP de objetos existentes)
+-- =============================================================================
+SELECT '>>> PASSO 1: Reset — removendo objetos existentes...' AS log;
+
+SET FOREIGN_KEY_CHECKS = 0;
+
+DROP DATABASE IF EXISTS dw_sisgesc;  -- Data Warehouse
+
+-- Módulo Financeiro
+DROP TABLE IF EXISTS sisgesc.tb_pagamentos;
+DROP TABLE IF EXISTS sisgesc.tb_mensalidades;
+DROP TABLE IF EXISTS sisgesc.tb_descontos_bolsas;
+DROP TABLE IF EXISTS sisgesc.tb_contratos_educacionais;
+DROP TABLE IF EXISTS sisgesc.tb_status_pagamento;
+
+-- Módulo RH
+DROP TABLE IF EXISTS sisgesc.tb_afastamentos;
+DROP TABLE IF EXISTS sisgesc.tb_tipo_afastamento;
+DROP TABLE IF EXISTS sisgesc.tb_ferias;
+DROP TABLE IF EXISTS sisgesc.tb_folha_verbas;
+DROP TABLE IF EXISTS sisgesc.tb_verbas;
+DROP TABLE IF EXISTS sisgesc.tb_folha_pagamento;
+DROP TABLE IF EXISTS sisgesc.tb_funcionario_beneficio;
+DROP TABLE IF EXISTS sisgesc.tb_beneficios;
+DROP TABLE IF EXISTS sisgesc.tb_professores;
+DROP TABLE IF EXISTS sisgesc.tb_titulacoes;
+DROP TABLE IF EXISTS sisgesc.tb_historico_cargos;
+DROP TABLE IF EXISTS sisgesc.tb_funcionarios;
+DROP TABLE IF EXISTS sisgesc.tb_cargos;
+DROP TABLE IF EXISTS sisgesc.tb_departamentos;
+
+-- Módulo Acadêmico
+DROP TABLE IF EXISTS sisgesc.tb_faltas;
+DROP TABLE IF EXISTS sisgesc.tb_notas;
+DROP TABLE IF EXISTS sisgesc.tb_log_notas;
+DROP TABLE IF EXISTS sisgesc.tb_avaliacoes;
+DROP TABLE IF EXISTS sisgesc.tb_resultado_matricula;
+DROP TABLE IF EXISTS sisgesc.tb_matriculas;
+DROP TABLE IF EXISTS sisgesc.tb_aulas;
+DROP TABLE IF EXISTS sisgesc.tb_salas;
+DROP TABLE IF EXISTS sisgesc.tb_turmas;
+DROP TABLE IF EXISTS sisgesc.tb_periodos;
+DROP TABLE IF EXISTS sisgesc.tb_pre_requisitos;
+DROP TABLE IF EXISTS sisgesc.tb_grade_curricular;
+DROP TABLE IF EXISTS sisgesc.tb_disciplinas;
+DROP TABLE IF EXISTS sisgesc.tb_historico_status_aluno;
+DROP TABLE IF EXISTS sisgesc.tb_aluno_curso;
+DROP TABLE IF EXISTS sisgesc.tb_alunos;
+DROP TABLE IF EXISTS sisgesc.tb_status_aluno;
+DROP TABLE IF EXISTS sisgesc.tb_cursos;
+DROP TABLE IF EXISTS sisgesc.tb_tipo_curso;
+
+-- Base / Pessoas
+DROP TABLE IF EXISTS sisgesc.tb_emails;
+DROP TABLE IF EXISTS sisgesc.tb_telefones;
+DROP TABLE IF EXISTS sisgesc.tb_enderecos;
+DROP TABLE IF EXISTS sisgesc.tb_cep;
+DROP TABLE IF EXISTS sisgesc.tb_pessoas;
+DROP TABLE IF EXISTS sisgesc.tb_schema_version;
+
+-- Views
+DROP VIEW IF EXISTS sisgesc.vw_mensalidades;
+DROP VIEW IF EXISTS sisgesc.vw_folha_pagamento;
+
+SET FOREIGN_KEY_CHECKS = 1;
+
+SELECT '>>> PASSO 1 CONCLUÍDO.' AS log;
+
+-- =============================================================================
+-- PASSO 2 — DDL: Criação do banco OLTP (sisgesc)
+-- =============================================================================
+SELECT '>>> PASSO 2: DDL — criando estrutura do banco sisgesc...' AS log;
+
+SOURCE SisGESC_Script_DDL_otimizado.sql;
+
+SELECT '>>> PASSO 2 CONCLUÍDO.' AS log;
+
+-- =============================================================================
+-- PASSO 3 — DML: Carga de dados operacionais + prova de idempotência
+-- =============================================================================
+SELECT '>>> PASSO 3: DML — carregando dados e validando idempotência...' AS log;
+
+SOURCE SisGESC_Script_DML_corrigido.sql;
+
+SELECT '>>> PASSO 3 CONCLUÍDO.' AS log;
+
+-- =============================================================================
+-- PASSO 4 — OLTP: Stored procedures + EXPLAIN de performance (Fase 5)
+-- =============================================================================
+SELECT '>>> PASSO 4: OLTP Procedures + Performance (EXPLAIN)...' AS log;
+
+SOURCE SisGESC_Script_Governanca_corrigido.sql;
+
+SELECT '>>> PASSO 4 CONCLUÍDO.' AS log;
+
+-- =============================================================================
+-- PASSO 5 — OLAP: Data Warehouse + ETL
+-- =============================================================================
+SELECT '>>> PASSO 5: OLAP — criando Data Warehouse e carregando ETL...' AS log;
+
+SOURCE SisGESC_Data_Warehouse_OLAP_corrigido.sql;
+
+SELECT '>>> PASSO 5 CONCLUÍDO.' AS log;
+
+-- =============================================================================
+-- PASSO 6 — VALIDAÇÃO FINAL: OLTP = OLAP
+-- =============================================================================
+SELECT '>>> PASSO 6: Validação OLTP × OLAP...' AS log;
+
+SELECT 'OLTP — tb_mensalidades'         AS origem, SUM(valor_liquido)             AS soma_total FROM sisgesc.tb_mensalidades
+UNION ALL
+SELECT 'OLAP — fato_receita',                       SUM(valor_mensalidade_liquido) AS soma_total FROM dw_sisgesc.fato_receita;
+
+-- Os dois valores DEVEM ser iguais. Diferença = erro no ETL.
+
+SELECT '╔══════════════════════════════════════════════╗' AS log;
+SELECT '║   SisGESC — INSTALAÇÃO COMPLETA FINALIZADA   ║' AS log;
+SELECT '╚══════════════════════════════════════════════╝' AS log;
+SELECT NOW() AS fim_execucao;
