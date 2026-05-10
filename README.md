@@ -1,6 +1,6 @@
 # SisGESC — Sistema de Gestão Escolar
 
-HEAD
+
 Projeto acadêmico (MySQL 8+): OLTP (`sisgesc`) com módulos Acadêmico, Financeiro e RH, mais camada OLAP (`dw_sisgesc`) com Star Schema e ETL.
 
 ## Pré-requisitos
