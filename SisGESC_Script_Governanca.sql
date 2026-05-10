@@ -1,7 +1,5 @@
--- =============================================================================
 -- SisGESC — Script de Governança e Performance — VERSÃO CORRIGIDA
 -- Sistema de Gestão Escolar — Universidade Privada
---
 
 USE sisgesc;
 
