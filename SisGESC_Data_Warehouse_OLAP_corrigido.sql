@@ -1,8 +1,6 @@
--- =============================================================================
--- SisGESC — Data Warehouse & OLAP — VERSÃO CORRIGIDA
--- Arquivo: SisGESC_Data_Warehouse_OLAP_corrigido.sql
--- Chamado por run_all.sql (SOURCE) após o OLTP. Inclui dim_unidade (Star Schema).
--- =============================================================================
+SisGESC — Data Warehouse & OLAP — VERSÃO CORRIGIDA
+Arquivo: SisGESC_Data_Warehouse_OLAP_corrigido.sql
+Chamado por run_all.sql (SOURCE) após o OLTP. Inclui dim_unidade (Star Schema).
 
 CREATE DATABASE IF NOT EXISTS dw_sisgesc 
 CHARACTER SET utf8mb4 
@@ -10,9 +8,8 @@ COLLATE utf8mb4_unicode_ci;
 
 USE dw_sisgesc;
 
--- ==============================================================================
--- TABELA DE DIMENSÃO: TEMPO
--- ==============================================================================
+TABELA DE DIMENSÃO: TEMPO
+
 CREATE TABLE IF NOT EXISTS dim_tempo (
     sk_tempo        INT PRIMARY KEY,
     data_completa   DATE NOT NULL UNIQUE,
@@ -35,9 +32,8 @@ CREATE TABLE IF NOT EXISTS dim_tempo (
     INDEX idx_semestre  (ano, semestre)
 ) ENGINE=InnoDB;
 
--- ==============================================================================
--- TABELA DE DIMENSÃO: ALUNO
--- ==============================================================================
+TABELA DE DIMENSÃO: ALUNO
+
 CREATE TABLE IF NOT EXISTS dim_aluno (
     sk_aluno             INT PRIMARY KEY AUTO_INCREMENT,
     cpf_aluno            VARCHAR(11) UNIQUE NOT NULL,
@@ -64,9 +60,8 @@ CREATE TABLE IF NOT EXISTS dim_aluno (
     INDEX idx_curso  (curso_atual)
 ) ENGINE=InnoDB;
 
--- ==============================================================================
--- TABELA DE DIMENSÃO: CURSO
--- ==============================================================================
+TABELA DE DIMENSÃO: CURSO
+
 CREATE TABLE IF NOT EXISTS dim_curso (
     sk_curso            INT PRIMARY KEY AUTO_INCREMENT,
     codigo_curso        INT UNIQUE NOT NULL,
@@ -85,9 +80,8 @@ CREATE TABLE IF NOT EXISTS dim_curso (
     INDEX idx_nivel        (nivel_academico)
 ) ENGINE=InnoDB;
 
--- ==============================================================================
--- TABELA DE DIMENSÃO: UNIDADE (campus / polo — requisito Star Schema da entrega)
--- ==============================================================================
+TABELA DE DIMENSÃO: UNIDADE (campus / polo — requisito Star Schema da entrega)
+
 CREATE TABLE IF NOT EXISTS dim_unidade (
     sk_unidade        INT PRIMARY KEY AUTO_INCREMENT,
     codigo_unidade    VARCHAR(30) NOT NULL UNIQUE,
@@ -98,9 +92,8 @@ CREATE TABLE IF NOT EXISTS dim_unidade (
     INDEX idx_codigo (codigo_unidade)
 ) ENGINE=InnoDB;
 
--- ==============================================================================
--- TABELA DE DIMENSÃO: PROFESSOR
--- ==============================================================================
+TABELA DE DIMENSÃO: PROFESSOR
+
 CREATE TABLE IF NOT EXISTS dim_professor (
     sk_professor        INT PRIMARY KEY AUTO_INCREMENT,
     cpf_professor       VARCHAR(11) UNIQUE NOT NULL,
@@ -120,9 +113,8 @@ CREATE TABLE IF NOT EXISTS dim_professor (
     INDEX idx_titulacao    (titulacao)
 ) ENGINE=InnoDB;
 
--- ==============================================================================
--- TABELA DE DIMENSÃO: DISCIPLINA
--- ==============================================================================
+TABELA DE DIMENSÃO: DISCIPLINA
+
 CREATE TABLE IF NOT EXISTS dim_disciplina (
     sk_disciplina         INT PRIMARY KEY AUTO_INCREMENT,
     codigo_disciplina     VARCHAR(20) UNIQUE NOT NULL,
@@ -140,9 +132,8 @@ CREATE TABLE IF NOT EXISTS dim_disciplina (
     INDEX idx_semestre (semestre_ideal)
 ) ENGINE=InnoDB;
 
--- ==============================================================================
--- TABELA DE FATOS: RECEITA FINANCEIRA
--- ==============================================================================
+TABELA DE FATOS: RECEITA FINANCEIRA
+
 CREATE TABLE IF NOT EXISTS fato_receita (
     sk_aluno                  INT,
     sk_curso                  INT,
@@ -175,9 +166,8 @@ CREATE TABLE IF NOT EXISTS fato_receita (
     INDEX idx_aluno_tempo (sk_aluno, sk_tempo_vencimento)
 ) ENGINE=InnoDB;
 
--- ==============================================================================
--- TABELA DE FATOS: DESEMPENHO ACADÊMICO
--- ==============================================================================
+TABELA DE FATOS: DESEMPENHO ACADÊMICO
+
 CREATE TABLE IF NOT EXISTS fato_desempenho (
     sk_aluno           INT,
     sk_professor       INT,
@@ -210,9 +200,8 @@ CREATE TABLE IF NOT EXISTS fato_desempenho (
     INDEX idx_curso_tempo (sk_curso, sk_tempo_conclusao)
 ) ENGINE=InnoDB;
 
--- ==============================================================================
--- TABELA DE FATOS: FOLHA DE PAGAMENTO
--- ==============================================================================
+TABELA DE FATOS: FOLHA DE PAGAMENTO
+
 CREATE TABLE IF NOT EXISTS fato_folha_pagamento (
     sk_professor              INT,
     sk_tempo                  INT,
@@ -241,9 +230,7 @@ CREATE TABLE IF NOT EXISTS fato_folha_pagamento (
     INDEX idx_tempo   (sk_tempo)
 ) ENGINE=InnoDB;
 
--- ==============================================================================
--- VIEWS ANALÍTICAS
--- ==============================================================================
+VIEWS ANALÍTICAS
 
 CREATE OR REPLACE VIEW v_receita_por_curso_mes AS
 SELECT
@@ -309,9 +296,7 @@ JOIN dim_tempo     dt ON dt.sk_tempo     = ffp.sk_tempo
 WHERE dp.eh_ativo = TRUE
 GROUP BY dp.departamento, dt.ano, dt.mes, dt.nome_mes;
 
--- ==============================================================================
--- PROCEDURES ETL
--- ==============================================================================
+PROCEDURES ETL
 
 DELIMITER $$
 
@@ -679,11 +664,10 @@ END$$
 
 DELIMITER ;
 
--- ==============================================================================
--- VALIDAÇÃO OBRIGATÓRIA: OLTP = OLAP
--- Execute após o ETL para confirmar que a carga foi correta.
--- ==============================================================================
+VALIDAÇÃO OBRIGATÓRIA: OLTP = OLAP
+Execute após o ETL para confirmar que a carga foi correta.
+
 SELECT '=== VALIDAÇÃO OLTP × OLAP ===' AS etapa;
 SELECT SUM(valor_liquido)             AS total_oltp FROM sisgesc.tb_mensalidades;
 SELECT SUM(valor_mensalidade_liquido) AS total_olap FROM dw_sisgesc.fato_receita;
--- Os dois valores DEVEM ser iguais. Diferença = erro no ETL.
+Os dois valores DEVEM ser iguais. Diferença = erro no ETL.
