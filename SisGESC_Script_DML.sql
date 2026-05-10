@@ -312,7 +312,6 @@ INSERT IGNORE INTO tb_professores (pk_fk_cpf, area_atuacao, fk_titulacao) VALUES
 ('10011122233', 'Engenharia de Software',  2),
 ('11122233355', 'Ciência da Computação',   3),
 ('22233344466', 'Administração',           1);
->>>>>>> 24d4a75c507c4d78d906313fc99809df8bd6b6e8
 
 INSERT IGNORE INTO tb_beneficios (pk_beneficio, nome, descricao) VALUES
 (1, 'Plano de Saúde',    'Cobertura médica e hospitalar'),
@@ -474,7 +473,7 @@ INSERT IGNORE INTO tb_contratos_educacionais (pk_contrato, fk_cpf_aluno, data_in
 (7, '77788899900', '2023-08-01', '2025-07-31', 15600.00, TRUE),
 (8, '88899900011', '2024-02-01', '2026-12-31', 12000.00, TRUE);
 
-<<<<<<< HEAD
+
 INSERT IGNORE INTO tb_descontos_bolsas (pk_desconto, tipo_bolsa, descricao) VALUES
 (1, 'Desempenho',  'Bolsa por desempenho acadêmico'),
 (2, 'FIES',        'Financiamento estudantil FIES'),
