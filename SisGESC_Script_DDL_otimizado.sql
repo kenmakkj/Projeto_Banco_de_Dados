@@ -1,15 +1,11 @@
--- =============================================================================
 -- SisGESC — Script DDL (MySQL)
 -- Sistema de Gestão Escolar — Universidade Privada
 -- Modelagem relacional em 3FN (Terceira Forma Normal)
---
---
 -- Módulos:
 --   1. Base / Pessoas
 --   2. Módulo Acadêmico
 --   3. Módulo RH
 --   4. Módulo Financeiro
--- =============================================================================
 
 CREATE DATABASE IF NOT EXISTS sisgesc
   CHARACTER SET utf8mb4
@@ -17,9 +13,7 @@ CREATE DATABASE IF NOT EXISTS sisgesc
 
 USE sisgesc;
 
--- =============================================================================
 -- BASE / PESSOAS
--- =============================================================================
 
 CREATE TABLE IF NOT EXISTS tb_pessoas (
   pk_cpf             CHAR(11)     NOT NULL,
@@ -76,9 +70,7 @@ CREATE TABLE IF NOT EXISTS tb_emails (
   CONSTRAINT fk_email_cpf FOREIGN KEY (fk_cpf) REFERENCES tb_pessoas(pk_cpf)
 );
 
--- =============================================================================
 -- MÓDULO ACADÊMICO
--- =============================================================================
 
 CREATE TABLE IF NOT EXISTS tb_tipo_curso (
   pk_tipo_curso INT         NOT NULL AUTO_INCREMENT,
@@ -238,9 +230,7 @@ CREATE TABLE IF NOT EXISTS tb_salas (
   CONSTRAINT pk_salas PRIMARY KEY (pk_sala)
 );
 
--- =============================================================================
 -- MÓDULO RH
--- =============================================================================
 
 CREATE TABLE IF NOT EXISTS tb_departamentos (
   pk_departamento    INT         NOT NULL AUTO_INCREMENT,
@@ -461,9 +451,7 @@ CREATE TABLE IF NOT EXISTS tb_afastamentos (
   CONSTRAINT fk_afas_tipo    FOREIGN KEY (fk_tipo)            REFERENCES tb_tipo_afastamento(pk_tipo)
 );
 
--- =============================================================================
 -- MÓDULO FINANCEIRO
--- =============================================================================
 
 CREATE TABLE IF NOT EXISTS tb_status_pagamento (
   pk_status_pagamento INT         NOT NULL,
@@ -532,9 +520,7 @@ CREATE TABLE IF NOT EXISTS tb_pagamentos (
   CONSTRAINT fk_pag_mensalidade FOREIGN KEY (fk_mensalidade) REFERENCES tb_mensalidades(pk_mensalidade)
 );
 
--- =============================================================================
 -- VIEWS — Campos Calculados (3FN)
--- =============================================================================
 
 CREATE OR REPLACE VIEW vw_mensalidades AS
 SELECT
@@ -574,9 +560,7 @@ GROUP BY
   fp.status, fp.data_pagamento,
   fp.salario_bruto, fp.total_descontos, fp.salario_liquido;
 
--- =============================================================================
 -- OTIMIZAÇÃO DE DESEMPENHO (ÍNDICES)
--- =============================================================================
 
 -- BASE / PESSOAS
 CREATE INDEX IF NOT EXISTS idx_end_cpf            ON tb_enderecos (fk_cpf);
@@ -629,9 +613,7 @@ CREATE INDEX IF NOT EXISTS idx_cd_desconto           ON tb_contrato_desconto (fk
 CREATE INDEX IF NOT EXISTS idx_mens_contrato_status  ON tb_mensalidades (fk_contrato, fk_status);
 CREATE INDEX IF NOT EXISTS idx_pag_mensalidade_data  ON tb_pagamentos (fk_mensalidade, data_pagamento);
 
--- =============================================================================
 -- CONSULTA COMPLETA (JOIN GERAL)
--- =============================================================================
 
 -- ACADÊMICO
 SELECT
